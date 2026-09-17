@@ -354,6 +354,7 @@ pluvia/
 ├── README.md              # Este documento, proposta da Parte 1
 └── docs/
     └── referencias.md     # Fichamento das fontes institucionais
+    └──logoPluvia.png      # Logo do projeto
 ```
 
 Os diagramas de arquitetura, as decisões técnicas e os contratos de API serão adicionados a `/docs` a partir da Parte 2, conforme forem produzidos.
