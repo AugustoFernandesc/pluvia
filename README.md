@@ -1,7 +1,6 @@
 # 🌧️ Pluvia
 
 ### Monitoramento e apoio à decisão para prevenção de alagamentos urbanos
-
 > Plataforma que consolida dados públicos de chuva, histórico de ocorrências e vulnerabilidade territorial, aplicando Inteligência Artificial para produzir análises contextuais de risco e para acompanhar as ações preventivas decorrentes dessas análises.
 
 **GCC129 · Sistemas Distribuídos · 2026/2** · Parte 1: Concepção e Pitch
