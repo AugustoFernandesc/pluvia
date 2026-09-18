@@ -318,7 +318,7 @@ Há ainda uma assimetria clara entre **escrita** (ingestão contínua de dados, 
 - A qualidade da análise é limitada pela cobertura e atualização das fontes públicas.
 - O sub-registro de ocorrências é problema conhecido em bases de desastres e afeta qualquer leitura histórica.
 - Regiões com menor densidade de monitoramento terão análises menos precisas, limitação que será declarada na própria interface.
-- Recorte territorial piloto restrito a **Lavras/MG**, escolhido por ser o município da instituição, ter porte tratável e possuir registro histórico no Atlas Digital. A restrição é intencional, para permitir validação de qualidade antes de qualquer generalização.
+- Recorte territorial piloto restrito a **Lavras/MG**, escolhido por ser o município da instituição, ter porte tratável e possuir registro histórico no Atlas Digital. A restrição é intencional, para permitir validação de qualidade antes de qualquer generalização.Dessa forma, começamos com mais qualidade
 
 ---
 
