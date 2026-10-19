@@ -1,0 +1,405 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Operações
+  version: 1.0.0
+  description: |
+    Ciclo de vida das ações preventivas e orquestração da SAGA de abertura de ação.
+    O recurso Acao implementa HATEOAS no formato HAL: os links disponíveis variam conforme o estado.
+servers:
+  - url: http://operacoes:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs
+tags:
+  - name: Acoes
+  - name: Saga
+
+paths:
+  /acoes:
+    post:
+      tags: [Acoes]
+      operationId: solicitarAcao
+      summary: Solicita a abertura de uma ação preventiva
+      description: |
+        Cria a ação no estado PENDENTE e inicia a SAGA de reserva de equipe e recurso.
+        Responde 202 porque o resultado depende da conclusão da SAGA.
+        O cliente acompanha o resultado pelo link self ou saga.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaAcao' }
+      responses:
+        '202':
+          description: Ação aceita e SAGA iniciada
+          headers:
+            Location:
+              description: URI da ação criada
+              schema: { type: string }
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/Acao' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+    get:
+      tags: [Acoes]
+      operationId: listarAcoes
+      summary: Lista ações preventivas
+      parameters:
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoAcao' } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: equipeId, in: query, schema: { type: string, format: uuid } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de ações
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/PaginaAcoes' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+
+  /acoes/{acaoId}:
+    parameters:
+      - $ref: '#/components/parameters/AcaoId'
+    get:
+      tags: [Acoes]
+      operationId: obterAcao
+      summary: Obtém uma ação preventiva com seus links de navegação
+      responses:
+        '200':
+          description: Ação encontrada
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/Acao' }
+              examples:
+                pendente: { $ref: '#/components/examples/AcaoPendente' }
+                confirmada: { $ref: '#/components/examples/AcaoConfirmada' }
+                concluida: { $ref: '#/components/examples/AcaoConcluida' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /acoes/{acaoId}/inicio:
+    parameters:
+      - $ref: '#/components/parameters/AcaoId'
+    post:
+      tags: [Acoes]
+      operationId: iniciarAcao
+      summary: Registra o início da execução em campo
+      description: Permitido apenas no estado CONFIRMADA. Leva a ação a EM_EXECUCAO.
+      responses:
+        '200':
+          description: Ação em execução
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/Acao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /acoes/{acaoId}/conclusao:
+    parameters:
+      - $ref: '#/components/parameters/AcaoId'
+    post:
+      tags: [Acoes]
+      operationId: concluirAcao
+      summary: Conclui a ação, registrando o resultado em campo
+      description: Permitido apenas no estado EM_EXECUCAO. Publica AcaoPreventivaConcluida, que libera as reservas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Conclusao' }
+      responses:
+        '200':
+          description: Ação concluída
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/Acao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /acoes/{acaoId}/cancelamento:
+    parameters:
+      - $ref: '#/components/parameters/AcaoId'
+    post:
+      tags: [Acoes]
+      operationId: cancelarAcao
+      summary: Cancela uma ação confirmada
+      description: Permitido apenas no estado CONFIRMADA. Publica AcaoPreventivaCancelada, que libera as reservas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Cancelamento' }
+      responses:
+        '200':
+          description: Ação cancelada
+          content:
+            application/hal+json:
+              schema: { $ref: '#/components/schemas/Acao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /acoes/{acaoId}/saga:
+    parameters:
+      - $ref: '#/components/parameters/AcaoId'
+    get:
+      tags: [Saga]
+      operationId: obterSaga
+      summary: Estado da SAGA de abertura da ação
+      description: Mostra cada passo executado, inclusive compensações. Usado para acompanhar e demonstrar a SAGA.
+      responses:
+        '200':
+          description: Estado da SAGA
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstadoSaga' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  parameters:
+    AcaoId:
+      name: acaoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Chave gerada pelo cliente. Reenvios com a mesma chave devolvem a mesma ação, sem iniciar nova SAGA.
+      schema: { type: string, maxLength: 64 }
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Tamanho:
+      name: tamanho
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição malformada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Transição de estado inválida para o estado atual
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      description: Erro no formato RFC 7807
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    EstadoAcao:
+      type: string
+      enum: [PENDENTE, CONFIRMADA, REJEITADA, EM_EXECUCAO, CONCLUIDA, CANCELADA]
+
+    TipoAcao:
+      type: string
+      enum: [VISTORIA, LIMPEZA_DRENAGEM, DESOBSTRUCAO, INSPECAO_PONTO_CRITICO]
+
+    Turno:
+      type: string
+      enum: [MANHA, TARDE, NOITE]
+
+    Especialidade:
+      type: string
+      enum: [DRENAGEM, VISTORIA, DESOBSTRUCAO, GERAL]
+
+    CategoriaRecurso:
+      type: string
+      enum: [CAMINHAO_HIDROJATO, RETROESCAVADEIRA, CAMINHONETE, BOMBA_SUCCAO, KIT_VISTORIA]
+
+    NovaAcao:
+      type: object
+      required: [regiaoId, tipo, data, turno, especialidade, categoriaRecurso]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        sinalizacaoId:
+          type: string
+          format: uuid
+          description: Sinalização de atenção que originou a ação, quando houver
+        tipo: { $ref: '#/components/schemas/TipoAcao' }
+        descricao: { type: string, maxLength: 500 }
+        data: { type: string, format: date }
+        turno: { $ref: '#/components/schemas/Turno' }
+        especialidade: { $ref: '#/components/schemas/Especialidade' }
+        equipeId:
+          type: string
+          format: uuid
+          description: Opcional. Se omitido, Equipes escolhe uma equipe disponível da especialidade
+        categoriaRecurso: { $ref: '#/components/schemas/CategoriaRecurso' }
+
+    Conclusao:
+      type: object
+      required: [resultado]
+      properties:
+        resultado: { type: string, minLength: 10, maxLength: 1000 }
+        observacoes: { type: string, maxLength: 1000 }
+
+    Cancelamento:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 5, maxLength: 500 }
+
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href: { type: string }
+        method:
+          type: string
+          description: Extensão ao HAL. Verbo HTTP da transição
+          enum: [GET, POST]
+        title: { type: string }
+
+    LinksAcao:
+      type: object
+      required: [self]
+      properties:
+        self: { $ref: '#/components/schemas/Link' }
+        regiao: { $ref: '#/components/schemas/Link' }
+        saga: { $ref: '#/components/schemas/Link' }
+        iniciar: { $ref: '#/components/schemas/Link' }
+        concluir: { $ref: '#/components/schemas/Link' }
+        cancelar: { $ref: '#/components/schemas/Link' }
+
+    Acao:
+      type: object
+      required: [id, regiaoId, tipo, data, turno, estado, criadaEm, _links]
+      properties:
+        id: { type: string, format: uuid }
+        regiaoId: { type: string, format: uuid }
+        sinalizacaoId: { type: string, format: uuid, nullable: true }
+        tipo: { $ref: '#/components/schemas/TipoAcao' }
+        descricao: { type: string, nullable: true }
+        data: { type: string, format: date }
+        turno: { $ref: '#/components/schemas/Turno' }
+        especialidade: { $ref: '#/components/schemas/Especialidade' }
+        categoriaRecurso: { $ref: '#/components/schemas/CategoriaRecurso' }
+        estado: { $ref: '#/components/schemas/EstadoAcao' }
+        solicitanteId: { type: string, format: uuid }
+        equipeId: { type: string, format: uuid, nullable: true }
+        recursoId: { type: string, format: uuid, nullable: true }
+        motivoRejeicao: { type: string, nullable: true }
+        motivoCancelamento: { type: string, nullable: true }
+        resultado: { type: string, nullable: true }
+        criadaEm: { type: string, format: date-time }
+        atualizadaEm: { type: string, format: date-time }
+        _links: { $ref: '#/components/schemas/LinksAcao' }
+
+    PaginaAcoes:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens:
+          type: array
+          items: { $ref: '#/components/schemas/Acao' }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    EstadoSaga:
+      type: object
+      required: [sagaId, acaoId, estado, passos]
+      properties:
+        sagaId: { type: string, format: uuid }
+        acaoId: { type: string, format: uuid }
+        estado:
+          type: string
+          enum: [AGUARDANDO_EQUIPE, AGUARDANDO_RECURSO, CONCLUIDA, COMPENSANDO, COMPENSADA]
+        passos:
+          type: array
+          items: { $ref: '#/components/schemas/PassoSaga' }
+        iniciadaEm: { type: string, format: date-time }
+        encerradaEm: { type: string, format: date-time, nullable: true }
+
+    PassoSaga:
+      type: object
+      required: [mensagem, direcao, registradoEm]
+      properties:
+        mensagem:
+          type: string
+          example: ReservaRecursoRecusada
+        direcao:
+          type: string
+          enum: [ENVIADA, RECEBIDA]
+        participante:
+          type: string
+          enum: [EQUIPES, FROTA]
+        detalhe: { type: string }
+        registradoEm: { type: string, format: date-time }
+
+  examples:
+    AcaoPendente:
+      summary: Ação no meio da SAGA, sem transições disponíveis
+      value:
+        id: 7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11
+        regiaoId: 2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45
+        tipo: LIMPEZA_DRENAGEM
+        data: '2026-10-20'
+        turno: MANHA
+        especialidade: DRENAGEM
+        categoriaRecurso: CAMINHAO_HIDROJATO
+        estado: PENDENTE
+        criadaEm: '2026-10-19T14:05:00Z'
+        _links:
+          self: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11 }
+          regiao: { href: /v1/regioes/2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45 }
+          saga: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11/saga }
+    AcaoConfirmada:
+      summary: Ação confirmada, pode ser iniciada ou cancelada
+      value:
+        id: 7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11
+        regiaoId: 2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45
+        tipo: LIMPEZA_DRENAGEM
+        data: '2026-10-20'
+        turno: MANHA
+        estado: CONFIRMADA
+        equipeId: a41f0c6d-2e8b-4f3a-b5c7-d8e9f0a1b2c3
+        recursoId: f0e1d2c3-b4a5-4968-8776-655443322110
+        criadaEm: '2026-10-19T14:05:00Z'
+        _links:
+          self: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11 }
+          regiao: { href: /v1/regioes/2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45 }
+          saga: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11/saga }
+          iniciar: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11/inicio, method: POST }
+          cancelar: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11/cancelamento, method: POST }
+    AcaoConcluida:
+      summary: Ação concluída, sem transições disponíveis
+      value:
+        id: 7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11
+        regiaoId: 2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45
+        tipo: LIMPEZA_DRENAGEM
+        data: '2026-10-20'
+        turno: MANHA
+        estado: CONCLUIDA
+        resultado: Canal desobstruído em 40 m; retirado material acumulado junto à ponte.
+        criadaEm: '2026-10-19T14:05:00Z'
+        _links:
+          self: { href: /v1/acoes/7c1e2a9e-3b0f-4a52-9d61-0f5a8b2e6c11 }
+          regiao: { href: /v1/regioes/2b9d8f40-51c3-4e0a-8a7b-9c0d1e2f3a45 }
