@@ -1,0 +1,409 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Monitoramento
+  version: 1.0.0
+  description: |
+    Chuva observada, previsão meteorológica, níveis de corpos d'água e sensores de nível.
+    As leituras dos sensores chegam por MQTT, não por esta API. O contrato de dispositivo está em docs/arquitetura/08-eventos.md.
+servers:
+  - url: http://monitoramento:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs e pela Análise
+tags:
+  - name: Estacoes
+  - name: Sensores
+  - name: Leituras
+  - name: Previsoes
+  - name: Ingestao
+
+paths:
+  /estacoes:
+    get:
+      tags: [Estacoes]
+      operationId: listarEstacoes
+      summary: Lista estações de todas as fontes
+      parameters:
+        - { name: fonte, in: query, schema: { $ref: '#/components/schemas/Fonte' } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de estações
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaEstacoes' }
+
+  /estacoes/{estacaoId}:
+    get:
+      tags: [Estacoes]
+      operationId: obterEstacao
+      summary: Obtém uma estação
+      parameters:
+        - { name: estacaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Estação encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Estacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /sensores:
+    get:
+      tags: [Sensores]
+      operationId: listarSensores
+      summary: Lista sensores de nível
+      parameters:
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: situacao, in: query, schema: { type: string, enum: [ATIVO, INATIVO] } }
+      responses:
+        '200':
+          description: Sensores
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sensor' }
+    post:
+      tags: [Sensores]
+      operationId: cadastrarSensor
+      summary: Cadastra um sensor de nível
+      description: |
+        Registra o dispositivo e o associa a uma região. As credenciais MQTT do dispositivo
+        são provisionadas no broker, fora desta API, para que segredos não trafeguem em respostas HTTP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovoSensor' }
+      responses:
+        '201':
+          description: Sensor cadastrado
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sensor' }
+        '409': { $ref: '#/components/responses/Conflito' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /sensores/{sensorId}:
+    get:
+      tags: [Sensores]
+      operationId: obterSensor
+      summary: Obtém um sensor com sua situação atual
+      parameters:
+        - { name: sensorId, in: path, required: true, schema: { type: string, example: LAV-CENTRO-01 } }
+      responses:
+        '200':
+          description: Sensor encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sensor' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /leituras:
+    get:
+      tags: [Leituras]
+      operationId: listarLeituras
+      summary: Série de leituras em um intervalo
+      description: O intervalo entre inicio e fim é limitado a 31 dias.
+      parameters:
+        - { name: estacaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: sensorId, in: query, schema: { type: string } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoLeitura' } }
+        - { name: inicio, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: fim, in: query, required: true, schema: { type: string, format: date-time } }
+        - $ref: '#/components/parameters/Pagina'
+        - { name: tamanho, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
+      responses:
+        '200':
+          description: Página de leituras
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaLeituras' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+
+  /regioes/{regiaoId}/acumulados:
+    get:
+      tags: [Leituras]
+      operationId: obterAcumulados
+      summary: Acumulados de chuva da região por janela de tempo
+      parameters:
+        - { name: regiaoId, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: janelas
+          in: query
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/Janela' }
+            default: [H24, H72]
+      responses:
+        '200':
+          description: Acumulados calculados
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Acumulado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /previsoes:
+    get:
+      tags: [Previsoes]
+      operationId: listarPrevisoes
+      summary: Previsões vigentes
+      description: Por padrão, devolve apenas o boletim mais recente de cada município.
+      parameters:
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: municipio, in: query, schema: { type: string } }
+        - { name: somenteVigentes, in: query, schema: { type: boolean, default: true } }
+      responses:
+        '200':
+          description: Previsões
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Previsao' }
+
+  /previsoes/{previsaoId}:
+    get:
+      tags: [Previsoes]
+      operationId: obterPrevisao
+      summary: Obtém um boletim de previsão
+      parameters:
+        - { name: previsaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Previsão encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Previsao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /ingestoes:
+    post:
+      tags: [Ingestao]
+      operationId: dispararIngestao
+      summary: Dispara ingestão manual de uma fonte
+      description: A ingestão roda periodicamente. Este endpoint força uma execução imediata, para uso administrativo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fonte]
+              properties:
+                fonte: { type: string, enum: [CEMADEN, INMET, ANA] }
+      responses:
+        '202':
+          description: Ingestão iniciada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ingestao' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /ingestoes/{ingestaoId}:
+    get:
+      tags: [Ingestao]
+      operationId: obterIngestao
+      summary: Acompanha uma execução de ingestão
+      parameters:
+        - { name: ingestaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Situação da ingestão
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ingestao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Tamanho:
+      name: tamanho
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição malformada, inclusive intervalo acima de 31 dias
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Conflito com o estado atual, como ingestão já em andamento
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    Fonte:
+      type: string
+      enum: [CEMADEN, INMET, ANA, SENSOR]
+
+    TipoLeitura:
+      type: string
+      enum: [CHUVA, NIVEL]
+
+    Janela:
+      type: string
+      enum: [H1, H24, H72, D7]
+
+    Ponto:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type: { type: string, enum: [Point] }
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+
+    Estacao:
+      type: object
+      required: [id, fonte, codigoExterno, tipo]
+      properties:
+        id: { type: string, format: uuid }
+        fonte: { $ref: '#/components/schemas/Fonte' }
+        codigoExterno: { type: string, description: Código da estação na fonte de origem }
+        nome: { type: string }
+        tipo: { $ref: '#/components/schemas/TipoLeitura' }
+        regiaoId: { type: string, format: uuid, nullable: true }
+        localizacao: { $ref: '#/components/schemas/Ponto' }
+        ativa: { type: boolean }
+
+    PaginaEstacoes:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Estacao' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    NovoSensor:
+      type: object
+      required: [sensorId, regiaoId, localizacao]
+      properties:
+        sensorId: { type: string, pattern: '^[A-Z0-9-]{3,40}$', example: LAV-CENTRO-01 }
+        regiaoId: { type: string, format: uuid }
+        localizacao: { $ref: '#/components/schemas/Ponto' }
+        descricao: { type: string, example: 'Ponte da Rua Direita, margem esquerda' }
+        nivelReferenciaCm:
+          type: number
+          description: Nível considerado normal no ponto, usado para contextualizar as leituras
+
+    Sensor:
+      allOf:
+        - $ref: '#/components/schemas/NovoSensor'
+        - type: object
+          required: [situacao]
+          properties:
+            tipo: { type: string, enum: [NIVEL_AGUA] }
+            unidade: { type: string, enum: [cm] }
+            situacao: { type: string, enum: [ATIVO, INATIVO] }
+            ultimaLeituraEm: { type: string, format: date-time, nullable: true }
+            ultimoValor: { type: number, nullable: true }
+            bateria: { type: integer, minimum: 0, maximum: 100, nullable: true }
+            simulado:
+              type: boolean
+              description: Indica se as leituras vêm do simulador
+
+    Leitura:
+      type: object
+      required: [tipo, valor, unidade, medidoEm]
+      properties:
+        estacaoId: { type: string, format: uuid, nullable: true }
+        sensorId: { type: string, nullable: true }
+        tipo: { $ref: '#/components/schemas/TipoLeitura' }
+        valor: { type: number }
+        unidade: { type: string, enum: [mm, cm] }
+        medidoEm: { type: string, format: date-time }
+        recebidoEm: { type: string, format: date-time }
+
+    PaginaLeituras:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Leitura' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    Acumulado:
+      type: object
+      required: [regiaoId, janela, valorMm, calculadoEm]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        janela: { $ref: '#/components/schemas/Janela' }
+        valorMm: { type: number }
+        estacoesConsideradas: { type: integer }
+        calculadoEm: { type: string, format: date-time }
+
+    Previsao:
+      type: object
+      required: [id, fonte, municipio, uf, boletimEmitidoEm, periodoInicio, periodoFim, acumuladoPrevistoMm]
+      properties:
+        id: { type: string, format: uuid }
+        fonte: { type: string, enum: [INMET] }
+        municipio: { type: string }
+        uf: { type: string }
+        boletimEmitidoEm:
+          type: string
+          format: date-time
+          description: Horário de emissão do boletim, registrado para rastreabilidade
+        periodoInicio: { type: string, format: date-time }
+        periodoFim: { type: string, format: date-time }
+        acumuladoPrevistoMm: { type: number }
+        probabilidadeChuvaPct: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        regioesAssociadas:
+          type: array
+          items: { type: string, format: uuid }
+        granularidade:
+          type: string
+          enum: [MUNICIPIO, REGIAO]
+          description: Quando MUNICIPIO, o mesmo volume vale para todas as regiões do município
+
+    Ingestao:
+      type: object
+      required: [id, fonte, situacao]
+      properties:
+        id: { type: string, format: uuid }
+        fonte: { type: string, enum: [CEMADEN, INMET, ANA] }
+        situacao: { type: string, enum: [EM_ANDAMENTO, CONCLUIDA, FALHOU] }
+        registrosRecebidos: { type: integer }
+        iniciadaEm: { type: string, format: date-time }
+        concluidaEm: { type: string, format: date-time, nullable: true }
+        erro: { type: string, nullable: true }
