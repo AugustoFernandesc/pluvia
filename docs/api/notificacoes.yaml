@@ -1,0 +1,187 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Notificações
+  version: 1.0.0
+  description: |
+    Alertas operacionais internos para a equipe técnica e agentes cadastrados.
+    Não emite alerta à população. As notificações são geradas a partir de eventos, não por esta API.
+servers:
+  - url: http://notificacoes:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs
+tags:
+  - name: Notificacoes
+  - name: Inscricoes
+
+paths:
+  /notificacoes:
+    get:
+      tags: [Notificacoes]
+      operationId: listarNotificacoes
+      summary: Caixa de entrada de um usuário
+      parameters:
+        - { name: destinatarioId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: lida, in: query, schema: { type: boolean } }
+        - { name: pagina, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: tamanho, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de notificações
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaNotificacoes' }
+
+  /notificacoes/{notificacaoId}/leitura:
+    post:
+      tags: [Notificacoes]
+      operationId: marcarComoLida
+      summary: Marca a notificação como lida
+      description: Idempotente. Marcar de novo uma notificação já lida mantém a data original.
+      parameters:
+        - { name: notificacaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Notificação lida
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notificacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /inscricoes:
+    get:
+      tags: [Inscricoes]
+      operationId: listarInscricoes
+      summary: Inscrições de alerta de um usuário
+      parameters:
+        - { name: usuarioId, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Inscrições
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Inscricao' }
+    post:
+      tags: [Inscricoes]
+      operationId: criarInscricao
+      summary: Inscreve um usuário para receber alertas de uma região
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaInscricao' }
+      responses:
+        '201':
+          description: Inscrição criada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Inscricao' }
+        '409':
+          description: O usuário já está inscrito nesta região
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /inscricoes/{inscricaoId}:
+    delete:
+      tags: [Inscricoes]
+      operationId: removerInscricao
+      summary: Remove uma inscrição
+      parameters:
+        - { name: inscricaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204':
+          description: Inscrição removida
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  responses:
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    TipoNotificacao:
+      type: string
+      enum: [ALERTA_OPERACIONAL, ACAO_ATRIBUIDA, ACAO_REJEITADA, ACAO_CANCELADA, SENSOR_INATIVO, OCORRENCIA_A_VALIDAR]
+
+    Canal:
+      type: string
+      enum: [INTERNO, PUSH, EMAIL]
+
+    Notificacao:
+      type: object
+      required: [id, destinatarioId, tipo, titulo, mensagem, criadaEm]
+      properties:
+        id: { type: string, format: uuid }
+        destinatarioId: { type: string, format: uuid }
+        tipo: { $ref: '#/components/schemas/TipoNotificacao' }
+        titulo: { type: string, example: 'Atenção: Centro' }
+        mensagem: { type: string }
+        regiaoId: { type: string, format: uuid, nullable: true }
+        referencia:
+          type: object
+          nullable: true
+          description: Recurso que originou a notificação
+          properties:
+            tipo: { type: string, enum: [SINALIZACAO, ACAO, SENSOR, OCORRENCIA] }
+            id: { type: string }
+        canais:
+          type: array
+          items: { $ref: '#/components/schemas/Canal' }
+        criadaEm: { type: string, format: date-time }
+        lidaEm: { type: string, format: date-time, nullable: true }
+
+    PaginaNotificacoes:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Notificacao' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+        naoLidas: { type: integer }
+
+    NovaInscricao:
+      type: object
+      required: [usuarioId, regiaoId]
+      properties:
+        usuarioId: { type: string, format: uuid }
+        regiaoId: { type: string, format: uuid }
+        nivelMinimo:
+          type: string
+          enum: [OBSERVACAO, ATENCAO, ALTA_ATENCAO]
+          default: ATENCAO
+        canais:
+          type: array
+          items: { $ref: '#/components/schemas/Canal' }
+          default: [INTERNO]
+
+    Inscricao:
+      allOf:
+        - $ref: '#/components/schemas/NovaInscricao'
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+            criadaEm: { type: string, format: date-time }
