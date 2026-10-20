@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · BFF Web
+  version: 1.0.0
+  description: |
+    Backend do painel web da equipe técnica e da gestão pública. Compõe dados de vários serviços por tela.
+    Requer JWT com papel GESTOR ou TECNICO. Rotas de ação e ocorrência repassam os contratos dos serviços de origem,
+    com links HATEOAS reescritos para /web/v1.
+servers:
+  - url: https://api.pluvia.local/web/v1
+    description: Acesso externo, pelo gateway
+security:
+  - bearer: []
+tags:
+  - name: Painel
+  - name: Planejamento
+  - name: Acoes
+  - name: Sinalizacoes
+  - name: Ocorrencias
+
+paths:
+  /painel:
+    get:
+      tags: [Painel]
+      operationId: obterPainel
+      summary: Visão geral de todas as regiões
+      description: Compõe Risco (panoramas) e Operações (ações abertas por região).
+      parameters:
+        - { name: municipio, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Painel
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Painel' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
+
+  /regioes/{regiaoId}:
+    get:
+      tags: [Painel]
+      operationId: obterDetalheRegiao
+      summary: Detalhe completo de uma região
+      description: |
+        Compõe Risco, Território, Operações e Análise, em paralelo.
+        Se a Análise não responder em 8 s, o bloco analise vem nulo e o restante é entregue normalmente.
+      parameters:
+        - $ref: '#/components/parameters/RegiaoId'
+      responses:
+        '200':
+          description: Detalhe da região
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DetalheRegiao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /planejamento/disponibilidade:
+    get:
+      tags: [Planejamento]
+      operationId: obterDisponibilidadePlanejamento
+      summary: Equipes e recursos disponíveis numa data
+      description: Compõe Equipes e Frota, em paralelo.
+      parameters:
+        - { name: data, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Disponibilidade combinada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DisponibilidadePlanejamento' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /acoes:
+    get:
+      tags: [Acoes]
+      operationId: listarAcoesWeb
+      summary: Lista ações. Repassa Operações
+      parameters:
+        - { name: estado, in: query, schema: { type: string } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Ações
+          content:
+            application/hal+json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Acoes]
+      operationId: solicitarAcaoWeb
+      summary: Solicita ação preventiva. Repassa Operações e inicia a SAGA
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '202':
+          description: Ação aceita, com links reescritos para /web/v1
+          content:
+            application/hal+json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /acoes/{acaoId}:
+    get:
+      tags: [Acoes]
+      operationId: obterAcaoWeb
+      summary: Obtém ação com todos os links. Repassa Operações
+      parameters:
+        - { name: acaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Ação
+          content:
+            application/hal+json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /acoes/{acaoId}/cancelamento:
+    post:
+      tags: [Acoes]
+      operationId: cancelarAcaoWeb
+      summary: Cancela ação confirmada. Exclusivo do papel GESTOR
+      parameters:
+        - { name: acaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string }
+      responses:
+        '200':
+          description: Ação cancelada
+          content:
+            application/hal+json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /sinalizacoes:
+    get:
+      tags: [Sinalizacoes]
+      operationId: listarSinalizacoesWeb
+      summary: Sinalizações de atenção. Repassa Risco
+      parameters:
+        - { name: estado, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Sinalizações
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /sinalizacoes/{sinalizacaoId}/reconhecimento:
+    post:
+      tags: [Sinalizacoes]
+      operationId: reconhecerSinalizacaoWeb
+      summary: Reconhece sinalização. Repassa Risco
+      parameters:
+        - { name: sinalizacaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Sinalização reconhecida
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /ocorrencias:
+    get:
+      tags: [Ocorrencias]
+      operationId: listarOcorrenciasWeb
+      summary: Ocorrências, inclusive as aguardando validação. Repassa Território
+      parameters:
+        - { name: situacao, in: query, schema: { type: string } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Ocorrências
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /ocorrencias/{ocorrenciaId}/validacao:
+    post:
+      tags: [Ocorrencias]
+      operationId: validarOcorrenciaWeb
+      summary: Valida ou descarta ocorrência. Exclusivo do papel TECNICO
+      parameters:
+        - { name: ocorrenciaId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Decisão registrada
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    RegiaoId:
+      name: regiaoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    NaoAutenticado:
+      description: JWT ausente, inválido ou expirado; resposta emitida pelo gateway antes de alcançar o BFF
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Corpo nativo do plugin jwt do Kong, com mensagem ou erros de claims
+            additionalProperties: true
+            properties:
+              message: { type: string }
+              exp: { type: string }
+          examples:
+            tokenAusente:
+              value: { message: Unauthorized }
+    Proibido:
+      description: Papel sem permissão para esta operação
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Transição inválida para o estado atual
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Indisponivel:
+      description: Serviço de Risco indisponível; sem panorama não há painel
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    NivelAtencao:
+      type: string
+      enum: [NORMAL, OBSERVACAO, ATENCAO, ALTA_ATENCAO]
+
+    Painel:
+      type: object
+      required: [regioes, contadores, atualizadoEm]
+      properties:
+        contadores:
+          type: object
+          properties:
+            porNivel:
+              type: object
+              additionalProperties: { type: integer }
+              example: { NORMAL: 9, OBSERVACAO: 3, ATENCAO: 2, ALTA_ATENCAO: 0 }
+            sinalizacoesAbertas: { type: integer }
+            acoesEmAndamento: { type: integer }
+        regioes:
+          type: array
+          items:
+            type: object
+            properties:
+              regiaoId: { type: string, format: uuid }
+              nome: { type: string }
+              nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
+              sinalizacoesAbertas: { type: integer }
+              acoesAbertas: { type: integer }
+              atualizadoEm: { type: string, format: date-time }
+        atualizadoEm: { type: string, format: date-time }
+
+    DetalheRegiao:
+      type: object
+      required: [regiao, panorama]
+      description: Exemplo completo em docs/arquitetura/04-bff.md
+      properties:
+        regiao: { type: object, description: 'Região com geometria, de Território' }
+        panorama: { type: object, description: 'Panorama completo, de Risco' }
+        cenarioPrevisto: { type: object, nullable: true, description: De Risco }
+        vulnerabilidade: { type: object, description: De Território }
+        ocorrenciasRecentes: { type: array, items: { type: object }, description: De Território }
+        acoes:
+          type: object
+          nullable: true
+          description: De Operações. Nulo se Operações não responder
+          properties:
+            abertas: { type: integer }
+            itens: { type: array, items: { type: object } }
+        analise:
+          type: object
+          nullable: true
+          description: De Análise. Nulo se a Análise não responder a tempo
+          properties:
+            sintese: { type: string }
+            origem: { type: string, enum: [LLM, CACHE, FALLBACK] }
+            geradaEm: { type: string, format: date-time }
+        avisos:
+          type: array
+          items: { type: string }
+          description: Indica blocos omitidos por falha parcial
+
+    DisponibilidadePlanejamento:
+      type: object
+      required: [data, equipes, recursos]
+      properties:
+        data: { type: string, format: date }
+        equipes: { type: array, items: { type: object }, description: De Equipes }
+        recursos: { type: array, items: { type: object }, description: De Frota }

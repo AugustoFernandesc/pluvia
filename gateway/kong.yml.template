@@ -1,0 +1,79 @@
+_format_version: "3.0"
+
+services:
+  - name: bff-web
+    url: http://bff-web:3000
+    routes:
+      - name: web
+        paths: ["/web/v1"]
+        strip_path: false
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify: ["exp"]
+      - name: rate-limiting
+        config:
+          minute: 300
+          limit_by: consumer
+          policy: local
+      - name: cors
+        config:
+          origins: ["http://localhost:5173"]
+          methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+  - name: bff-mobile
+    url: http://bff-mobile:3000
+    routes:
+      - name: mobile-publico
+        paths: ["/mobile/v1/publico"]
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 30
+              limit_by: ip
+              policy: local
+      - name: mobile
+        paths: ["/mobile/v1"]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify: ["exp"]
+          - name: rate-limiting
+            config:
+              minute: 120
+              limit_by: consumer
+              policy: local
+
+  - name: keycloak
+    url: http://keycloak:8080
+    routes:
+      - name: auth
+        paths: ["/auth"]
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          limit_by: ip
+          policy: local
+
+consumers:
+  - username: pluvia-keycloak
+    jwt_secrets:
+      - key: __KEYCLOAK_ISSUER_JSON__
+        algorithm: RS256
+        rsa_public_key: __KEYCLOAK_REALM_PUBLIC_KEY_JSON__
+
+plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 1
