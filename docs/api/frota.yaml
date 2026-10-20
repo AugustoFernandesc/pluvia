@@ -1,0 +1,334 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Frota
+  version: 1.0.0
+  description: |
+    Veículos e equipamentos, períodos de manutenção e reservas por data e turno.
+    Assim como em Equipes, reservas nascem apenas dos comandos ReservarRecurso e LiberarRecurso da SAGA
+    e são expostas pela API somente para leitura.
+servers:
+  - url: http://frota:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs
+tags:
+  - name: Recursos
+  - name: Manutencoes
+  - name: Reservas
+
+paths:
+  /recursos:
+    get:
+      tags: [Recursos]
+      operationId: listarRecursos
+      summary: Lista veículos e equipamentos
+      parameters:
+        - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoRecurso' } }
+        - { name: categoria, in: query, schema: { $ref: '#/components/schemas/CategoriaRecurso' } }
+        - { name: situacao, in: query, schema: { $ref: '#/components/schemas/SituacaoRecurso' } }
+      responses:
+        '200':
+          description: Recursos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Recurso' }
+    post:
+      tags: [Recursos]
+      operationId: cadastrarRecurso
+      summary: Cadastra um veículo ou equipamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovoRecurso' }
+      responses:
+        '201':
+          description: Recurso criado
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recurso' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /recursos/{recursoId}:
+    parameters:
+      - $ref: '#/components/parameters/RecursoId'
+    get:
+      tags: [Recursos]
+      operationId: obterRecurso
+      summary: Obtém um recurso
+      responses:
+        '200':
+          description: Recurso encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recurso' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    patch:
+      tags: [Recursos]
+      operationId: atualizarRecurso
+      summary: Atualiza dados cadastrais de um recurso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descricao: { type: string }
+                situacao: { $ref: '#/components/schemas/SituacaoRecurso' }
+      responses:
+        '200':
+          description: Recurso atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recurso' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /recursos/{recursoId}/disponibilidade:
+    get:
+      tags: [Recursos]
+      operationId: obterDisponibilidadeRecurso
+      summary: Disponibilidade do recurso por turno numa data
+      parameters:
+        - $ref: '#/components/parameters/RecursoId'
+        - { name: data, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Disponibilidade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disponibilidade' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /disponibilidade:
+    get:
+      tags: [Recursos]
+      operationId: listarDisponibilidadeRecursos
+      summary: Disponibilidade de todos os recursos numa data
+      description: Usado pelo BFF Web na tela de planejamento.
+      parameters:
+        - { name: data, in: query, required: true, schema: { type: string, format: date } }
+        - { name: categoria, in: query, schema: { $ref: '#/components/schemas/CategoriaRecurso' } }
+      responses:
+        '200':
+          description: Disponibilidade por recurso
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Disponibilidade' }
+
+  /recursos/{recursoId}/manutencoes:
+    parameters:
+      - $ref: '#/components/parameters/RecursoId'
+    get:
+      tags: [Manutencoes]
+      operationId: listarManutencoes
+      summary: Lista manutenções do recurso
+      responses:
+        '200':
+          description: Manutenções
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Manutencao' }
+    post:
+      tags: [Manutencoes]
+      operationId: registrarManutencao
+      summary: Registra período de manutenção
+      description: |
+        Durante o período, o recurso não pode ser reservado.
+        Usado na demonstração da Parte 4 para provocar a falha da SAGA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaManutencao' }
+      responses:
+        '201':
+          description: Manutenção registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Manutencao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: O período se sobrepõe a outra manutenção ou a reserva confirmada
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /reservas:
+    get:
+      tags: [Reservas]
+      operationId: listarReservasRecurso
+      summary: Lista reservas de recurso
+      parameters:
+        - { name: recursoId, in: query, schema: { type: string, format: uuid } }
+        - { name: acaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoReserva' } }
+      responses:
+        '200':
+          description: Reservas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReservaRecurso' }
+
+  /reservas/{reservaId}:
+    get:
+      tags: [Reservas]
+      operationId: obterReservaRecurso
+      summary: Obtém uma reserva de recurso
+      parameters:
+        - { name: reservaId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Reserva encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservaRecurso' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  parameters:
+    RecursoId:
+      name: recursoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição malformada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Violação de unicidade, como identificação já cadastrada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    TipoRecurso:
+      type: string
+      enum: [VEICULO, EQUIPAMENTO]
+
+    CategoriaRecurso:
+      type: string
+      enum: [CAMINHAO_HIDROJATO, RETROESCAVADEIRA, CAMINHONETE, BOMBA_SUCCAO, KIT_VISTORIA]
+
+    SituacaoRecurso:
+      type: string
+      enum: [OPERACIONAL, INATIVO]
+
+    Turno:
+      type: string
+      enum: [MANHA, TARDE, NOITE]
+
+    EstadoReserva:
+      type: string
+      enum: [PROVISORIA, CONFIRMADA, ENCERRADA, CANCELADA, EXPIRADA]
+
+    NovoRecurso:
+      type: object
+      required: [tipo, categoria, identificacao]
+      properties:
+        tipo: { $ref: '#/components/schemas/TipoRecurso' }
+        categoria: { $ref: '#/components/schemas/CategoriaRecurso' }
+        identificacao:
+          type: string
+          description: Placa, para veículos, ou número de patrimônio, para equipamentos
+          example: ABC1D23
+        descricao: { type: string }
+
+    Recurso:
+      allOf:
+        - $ref: '#/components/schemas/NovoRecurso'
+        - type: object
+          required: [id, situacao]
+          properties:
+            id: { type: string, format: uuid }
+            situacao: { $ref: '#/components/schemas/SituacaoRecurso' }
+            emManutencaoAgora: { type: boolean }
+            criadoEm: { type: string, format: date-time }
+
+    Disponibilidade:
+      type: object
+      required: [recursoId, data, turnos]
+      properties:
+        recursoId: { type: string, format: uuid }
+        categoria: { $ref: '#/components/schemas/CategoriaRecurso' }
+        identificacao: { type: string }
+        data: { type: string, format: date }
+        turnos:
+          type: array
+          items:
+            type: object
+            required: [turno, disponivel]
+            properties:
+              turno: { $ref: '#/components/schemas/Turno' }
+              disponivel: { type: boolean }
+              motivo:
+                type: string
+                nullable: true
+                enum: [RESERVADO, EM_MANUTENCAO, null]
+              reservaId: { type: string, format: uuid, nullable: true }
+
+    NovaManutencao:
+      type: object
+      required: [inicio, fim, motivo]
+      properties:
+        inicio: { type: string, format: date-time }
+        fim: { type: string, format: date-time }
+        motivo: { type: string, example: Revisão da bomba de alta pressão }
+
+    Manutencao:
+      allOf:
+        - $ref: '#/components/schemas/NovaManutencao'
+        - type: object
+          required: [id, recursoId]
+          properties:
+            id: { type: string, format: uuid }
+            recursoId: { type: string, format: uuid }
+
+    ReservaRecurso:
+      type: object
+      required: [id, recursoId, acaoId, sagaId, data, turno, estado]
+      properties:
+        id: { type: string, format: uuid }
+        recursoId: { type: string, format: uuid }
+        acaoId: { type: string, format: uuid }
+        sagaId: { type: string, format: uuid }
+        data: { type: string, format: date }
+        turno: { $ref: '#/components/schemas/Turno' }
+        estado: { $ref: '#/components/schemas/EstadoReserva' }
+        criadaEm: { type: string, format: date-time }
+        atualizadaEm: { type: string, format: date-time }

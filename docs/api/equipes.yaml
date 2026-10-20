@@ -1,0 +1,321 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Equipes
+  version: 1.0.0
+  description: |
+    Equipes de campo, indisponibilidades e reservas por data e turno.
+    Reservas não são criadas por esta API: nascem exclusivamente dos comandos ReservarEquipe e LiberarEquipe da SAGA
+    de abertura de ação, para que nunca exista reserva sem ação correspondente. Por isso, a API expõe reservas apenas para leitura.
+servers:
+  - url: http://equipes:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs
+tags:
+  - name: Equipes
+  - name: Reservas
+
+paths:
+  /equipes:
+    get:
+      tags: [Equipes]
+      operationId: listarEquipes
+      summary: Lista equipes
+      parameters:
+        - { name: especialidade, in: query, schema: { $ref: '#/components/schemas/Especialidade' } }
+        - { name: ativa, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Equipes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Equipe' }
+    post:
+      tags: [Equipes]
+      operationId: cadastrarEquipe
+      summary: Cadastra uma equipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaEquipe' }
+      responses:
+        '201':
+          description: Equipe criada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipe' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /equipes/{equipeId}:
+    parameters:
+      - $ref: '#/components/parameters/EquipeId'
+    get:
+      tags: [Equipes]
+      operationId: obterEquipe
+      summary: Obtém uma equipe
+      responses:
+        '200':
+          description: Equipe encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipe' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    patch:
+      tags: [Equipes]
+      operationId: atualizarEquipe
+      summary: Atualiza dados cadastrais de uma equipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome: { type: string }
+                especialidade: { $ref: '#/components/schemas/Especialidade' }
+                integrantes: { type: integer, minimum: 1 }
+                ativa: { type: boolean }
+      responses:
+        '200':
+          description: Equipe atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Equipe' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /equipes/{equipeId}/disponibilidade:
+    get:
+      tags: [Equipes]
+      operationId: obterDisponibilidadeEquipe
+      summary: Disponibilidade da equipe por turno numa data
+      parameters:
+        - $ref: '#/components/parameters/EquipeId'
+        - { name: data, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Disponibilidade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disponibilidade' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /disponibilidade:
+    get:
+      tags: [Equipes]
+      operationId: listarDisponibilidade
+      summary: Disponibilidade de todas as equipes numa data
+      description: Usado pelo BFF Web na tela de planejamento.
+      parameters:
+        - { name: data, in: query, required: true, schema: { type: string, format: date } }
+        - { name: especialidade, in: query, schema: { $ref: '#/components/schemas/Especialidade' } }
+      responses:
+        '200':
+          description: Disponibilidade por equipe
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Disponibilidade' }
+
+  /equipes/{equipeId}/indisponibilidades:
+    parameters:
+      - $ref: '#/components/parameters/EquipeId'
+    get:
+      tags: [Equipes]
+      operationId: listarIndisponibilidades
+      summary: Lista indisponibilidades da equipe
+      responses:
+        '200':
+          description: Indisponibilidades
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Indisponibilidade' }
+    post:
+      tags: [Equipes]
+      operationId: registrarIndisponibilidade
+      summary: Registra período em que a equipe não pode ser alocada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaIndisponibilidade' }
+      responses:
+        '201':
+          description: Indisponibilidade registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Indisponibilidade' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: O período conflita com reserva já confirmada
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /reservas:
+    get:
+      tags: [Reservas]
+      operationId: listarReservasEquipe
+      summary: Lista reservas de equipe
+      parameters:
+        - { name: equipeId, in: query, schema: { type: string, format: uuid } }
+        - { name: acaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: data, in: query, schema: { type: string, format: date } }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoReserva' } }
+      responses:
+        '200':
+          description: Reservas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReservaEquipe' }
+
+  /reservas/{reservaId}:
+    get:
+      tags: [Reservas]
+      operationId: obterReservaEquipe
+      summary: Obtém uma reserva de equipe
+      parameters:
+        - { name: reservaId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Reserva encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservaEquipe' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  parameters:
+    EquipeId:
+      name: equipeId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição malformada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Violação de unicidade
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    Especialidade:
+      type: string
+      enum: [DRENAGEM, VISTORIA, DESOBSTRUCAO, GERAL]
+
+    Turno:
+      type: string
+      enum: [MANHA, TARDE, NOITE]
+
+    EstadoReserva:
+      type: string
+      description: |
+        PROVISORIA enquanto a SAGA não termina. CONFIRMADA após AcaoPreventivaConfirmada.
+        ENCERRADA após conclusão da ação. CANCELADA por compensação ou cancelamento.
+        EXPIRADA quando provisória por mais de 15 minutos.
+      enum: [PROVISORIA, CONFIRMADA, ENCERRADA, CANCELADA, EXPIRADA]
+
+    NovaEquipe:
+      type: object
+      required: [nome, especialidade, integrantes]
+      properties:
+        nome: { type: string, example: Equipe Drenagem Norte }
+        especialidade: { $ref: '#/components/schemas/Especialidade' }
+        integrantes: { type: integer, minimum: 1 }
+
+    Equipe:
+      allOf:
+        - $ref: '#/components/schemas/NovaEquipe'
+        - type: object
+          required: [id, ativa]
+          properties:
+            id: { type: string, format: uuid }
+            ativa: { type: boolean }
+            criadaEm: { type: string, format: date-time }
+
+    Disponibilidade:
+      type: object
+      required: [equipeId, data, turnos]
+      properties:
+        equipeId: { type: string, format: uuid }
+        equipeNome: { type: string }
+        data: { type: string, format: date }
+        turnos:
+          type: array
+          items:
+            type: object
+            required: [turno, disponivel]
+            properties:
+              turno: { $ref: '#/components/schemas/Turno' }
+              disponivel: { type: boolean }
+              motivo:
+                type: string
+                nullable: true
+                enum: [RESERVADA, INDISPONIVEL, null]
+              reservaId: { type: string, format: uuid, nullable: true }
+
+    NovaIndisponibilidade:
+      type: object
+      required: [inicio, fim, motivo]
+      properties:
+        inicio: { type: string, format: date-time }
+        fim: { type: string, format: date-time }
+        motivo: { type: string, example: Treinamento }
+
+    Indisponibilidade:
+      allOf:
+        - $ref: '#/components/schemas/NovaIndisponibilidade'
+        - type: object
+          required: [id, equipeId]
+          properties:
+            id: { type: string, format: uuid }
+            equipeId: { type: string, format: uuid }
+
+    ReservaEquipe:
+      type: object
+      required: [id, equipeId, acaoId, sagaId, data, turno, estado]
+      properties:
+        id: { type: string, format: uuid }
+        equipeId: { type: string, format: uuid }
+        acaoId: { type: string, format: uuid }
+        sagaId: { type: string, format: uuid }
+        data: { type: string, format: date }
+        turno: { $ref: '#/components/schemas/Turno' }
+        estado: { $ref: '#/components/schemas/EstadoReserva' }
+        criadaEm: { type: string, format: date-time }
+        atualizadaEm: { type: string, format: date-time }

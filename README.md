@@ -1,11 +1,11 @@
 # 🌧️ Pluvia
 
 ### Monitoramento e apoio à decisão para prevenção de alagamentos urbanos
-> Plataforma que consolida dados públicos de chuva observada e prevista, histórico de ocorrências e vulnerabilidade territorial, aplicando Inteligência Artificial para produzir análises contextuais de risco e para acompanhar as ações preventivas decorrentes dessas análises.
+> Plataforma que consolida dados públicos de chuva observada e prevista, histórico de ocorrências, vulnerabilidade territorial e leituras de sensores de nível, aplicando Inteligência Artificial para produzir análises contextuais de risco e para acompanhar as ações preventivas decorrentes dessas análises.
 
-**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 1: Concepção e Pitch
+**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 2: Arquitetura
 
-> ⚠️ A Pluvia **não** prevê alagamentos, **não** emite alerta oficial e **não** substitui a Defesa Civil. A plataforma utiliza previsões meteorológicas produzidas por órgãos oficiais como mais uma evidência, organiza esse conjunto, produz análises e apoia o planejamento de ações preventivas de rotina, como vistoria, inspeção e manutenção de drenagem, definidas pelo próprio município. A decisão e a resposta a emergências permanecem humanas e institucionais.
+> ⚠️ A Pluvia **não** prevê alagamentos, **não** emite alerta oficial à população e **não** substitui a Defesa Civil. A plataforma utiliza previsões meteorológicas produzidas por órgãos oficiais como mais uma evidência, organiza esse conjunto, produz análises e apoia o planejamento de ações preventivas de rotina, como vistoria, inspeção e manutenção de drenagem, definidas pelo próprio município. Os alertas emitidos pela plataforma são **operacionais e internos**, dirigidos à equipe técnica e aos agentes cadastrados. A decisão e a resposta a emergências permanecem humanas e institucionais.
 
 ---
 
@@ -17,6 +17,15 @@
 | Alexandre Bortone | [@alebortone](https://github.com/alebortone) |
 | Lucas Marcelino Neves | [@lucasnevesdv](https://github.com/lucasnevesdv) |
 | Mark Leite Sá | [@markesapucai](https://github.com/markesapucai) |
+
+---
+
+## 🔁 Devolutiva da Parte 1
+
+| Ponto levantado | Como foi incorporado |
+| --------------- | -------------------- |
+| **Envio de alertas** | Serviço de Notificações emite **alertas operacionais internos** à equipe técnica e aos agentes inscritos por região, disparados por sinalização de atenção, ação atribuída ou sensor sem comunicação. Alerta à população continua sendo atribuição da Defesa Civil. |
+| **Sensores de nível em campo** | A ingestão de sensores segue um **contrato de dispositivo MQTT** documentado. Na versão acadêmica, as leituras vêm de um simulador que implementa o mesmo contrato, e um dispositivo físico pode substituí-lo sem alteração no sistema. Ver [contrato de sensores](docs/arquitetura/08-eventos.md#contrato-de-dispositivo-sensores-de-nível). |
 
 ---
 
@@ -67,7 +76,7 @@ Há ainda um segundo recorte do mesmo problema, que é temporal. A previsão met
 
 A Pluvia executa seis movimentos:
 
-**🔗 Integrar.** Coletar e normalizar dados públicos de chuva observada e prevista, ocorrências históricas, características do território e indicadores de vulnerabilidade em uma base comum e comparável por região.
+**🔗 Integrar.** Coletar e normalizar dados públicos de chuva observada e prevista, ocorrências históricas, características do território e indicadores de vulnerabilidade, além de leituras de sensores de nível d'água em pontos críticos, em uma base comum e comparável por região.
 
 **🧭 Contextualizar.** Relacionar as condições recentes de uma região ao seu próprio histórico e às suas características estruturais. O mesmo volume de chuva não significa a mesma coisa em territórios diferentes, e é esse contraste que a plataforma torna explícito.
 
@@ -75,7 +84,7 @@ A Pluvia executa seis movimentos:
 
 **🤖 Analisar com IA.** Interpretar o conjunto consolidado, destacar regiões com sinais convergentes de atenção e produzir sínteses legíveis por quem não é especialista em dados.
 
-**📣 Comunicar.** Entregar painéis, sinalizações de atenção e relatórios explicáveis, sempre indicando quais dados sustentam cada conclusão e qual a data de referência da previsão utilizada.
+**📣 Comunicar.** Entregar painéis, sinalizações de atenção, alertas operacionais internos e relatórios explicáveis, sempre indicando quais dados sustentam cada conclusão e qual a data de referência da previsão utilizada.
 
 **🛠️ Acompanhar.** Permitir que a análise se converta em ação. A partir de uma sinalização de atenção, a equipe registra uma **ação preventiva** (vistoria, inspeção de bueiro, limpeza de canal, verificação de ponto crítico) com região, responsável, prazo e recursos alocados: equipe, veículo, equipamento. A plataforma acompanha a execução até a confirmação em campo e devolve o resultado ao histórico da região.
 
@@ -84,10 +93,16 @@ A Pluvia executa seis movimentos:
 ### O ciclo completo
 
 ```text
-passado (histórico) → presente (chuva observada) → cenário previsto
-        → sinalização de atenção → ação preventiva → resultado em campo
-        → novo histórico
+passado (histórico) → presente (chuva observada e nível) → cenário previsto
+        → sinalização de atenção → alerta operacional → ação preventiva
+        → resultado em campo → novo histórico
 ```
+
+### 📡 Sensores de nível
+
+Pontos críticos, como pontes e trechos de canal, podem receber sensores de nível d'água. A plataforma define um **contrato de dispositivo** (MQTT, tópico por sensor, mensagem com número sequencial e horário da medição) e trata qualquer dispositivo que o respeite da mesma forma.
+
+Na versão acadêmica, as leituras vêm de um **simulador** que implementa esse contrato e reproduz, sob comando, as falhas reais de um dispositivo em campo: silêncio, leitura duplicada, mensagem fora de ordem e bateria baixa. A placa de referência para um dispositivo físico é a ESP32, que possui Wi-Fi integrado.
 
 ### Perfis de usuário
 
@@ -96,11 +111,12 @@ A plataforma atende dois públicos com necessidades distintas, o que se reflete 
 | Perfil | Cliente | O que precisa |
 | ------ | ------- | ------------- |
 | **Equipe técnica / gestão pública** | Painel web | Visão comparativa entre regiões, histórico completo, cenário previsto por região, análises detalhadas, planejamento e acompanhamento de ações preventivas, alocação de equipes e recursos |
-| **Agentes em campo e comunidade** | Aplicação leve / mobile | Informação sobre a própria região em linguagem simples, incluindo o que está previsto para os próximos dias, registro de ocorrências observadas, execução e confirmação das ações atribuídas |
+| **Agentes em campo e comunidade** | App mobile | Informação sobre a própria região em linguagem simples, incluindo o que está previsto para os próximos dias, alertas operacionais, registro de ocorrências observadas, execução e confirmação das ações atribuídas |
 
 ### Princípios de projeto
 
 - **Apoio, nunca substituição.** Acionamento de emergência e alerta oficial à população permanecem com os órgãos competentes.
+- **Alerta operacional, não alerta público.** Os alertas da plataforma são dirigidos a quem planeja e executa ações preventivas.
 - **Rastreabilidade.** Toda análise aponta fonte, período e, quando houver previsão envolvida, o horário de emissão do boletim utilizado.
 - **Linguagem de atenção, não de previsão.** A plataforma indica que uma região _merece atenção_ e explica por quê. Nunca afirma que um alagamento ocorrerá.
 - **Previsão é insumo, não produto.** A Pluvia consome previsão meteorológica oficial e não produz modelagem meteorológica própria.
@@ -118,12 +134,14 @@ flowchart LR
     A3[Características das regiões]
     A4[Indicadores de vulnerabilidade]
     A5[Previsão meteorológica]
+    A6["Sensores de nível<br/>simulados na versão acadêmica"]
 
     A1 --> P
     A2 --> P
     A3 --> P
     A4 --> P
     A5 --> P
+    A6 --> P
 
     P[Plataforma Pluvia<br/>integração e consolidação]
     P --> R[Análise de risco contextual<br/>situação atual]
@@ -133,7 +151,7 @@ flowchart LR
     BC[Base de conhecimento<br/>prevenção e resposta] --> IA
     IA[Camada de IA<br/>interpretação e síntese]
 
-    IA --> S[Painéis, sinalizações<br/>e relatórios explicáveis]
+    IA --> S[Painéis, sinalizações,<br/>alertas operacionais<br/>e relatórios explicáveis]
     S --> D1[Equipe técnica<br/>e gestão pública]
     S --> D2[Agentes em campo<br/>e comunidade]
 
@@ -150,9 +168,9 @@ flowchart LR
     style AP fill:#fce4ec,stroke:#ad1457
 ```
 
-_A previsão meteorológica entra como fonte da primeira versão. A linha tracejada indica o enriquecimento do cenário previsto pelo histórico de ações preventivas, que só se torna possível depois que a plataforma acumular registros próprios._
+_A linha tracejada indica o enriquecimento do cenário previsto pelo histórico de ações preventivas, que só se torna possível depois que a plataforma acumular registros próprios._
 
-Diagrama **conceitual**, descrevendo o fluxo de informação. A arquitetura técnica (decomposição, comunicação e contratos) será definida na Parte 2.
+Diagrama **conceitual**, descrevendo o fluxo de informação. A arquitetura técnica está documentada em [`docs/arquitetura`](docs/arquitetura/README.md).
 
 ---
 
@@ -164,7 +182,7 @@ A incorporação da previsão é escalonada. Isso deixa explícito o que a prime
 | ------ | ---------------------- | -------------- |
 | **1. Cenário previsto** _(primeira versão)_ | Ingere a previsão oficial, apresenta o acumulado previsto por região e o compara ao padrão histórico local e às características do território, gerando sinalização de atenção com antecedência | Apenas das fontes públicas já mapeadas |
 | **2. Cenário análogo** _(etapa seguinte)_ | Relaciona a previsão a eventos anteriores de intensidade semelhante na mesma região e às ações preventivas registradas naquele período | Volume mínimo de eventos e de ações registrados na própria plataforma |
-| **3. Modelagem própria** _(fora do escopo do trabalho)_ | Modelos de previsão hidrológica próprios, sensoriamento local, integração com sistemas oficiais de alerta | Instrumentação, validação técnica e vínculo institucional |
+| **3. Modelagem própria** _(fora do escopo do trabalho)_ | Modelos de previsão hidrológica próprios, sensoriamento físico instalado, integração com sistemas oficiais de alerta | Instrumentação, validação técnica e vínculo institucional |
 
 > A camada 2 é limitada por dado, não por esforço de implementação. Com 11 ocorrências registradas em 34 anos no recorte piloto, a base de comparação começa pequena e cresce à medida que a plataforma é usada. Declarar isso é mais honesto do que apresentar comparação histórica robusta desde o primeiro dia.
 
@@ -182,7 +200,7 @@ A IA tem propósito específico dentro do domínio: **transformar um conjunto gr
 | **Síntese explicável** | Produz resumo em linguagem natural do porquê de uma região aparecer em destaque | Torna a análise utilizável por quem não tem perfil técnico em dados |
 | **Consulta à base de conhecimento** | Responde com apoio em material de referência sobre prevenção e resposta a eventos hidrológicos | Recuperação sobre documentos próprios do domínio, não conhecimento genérico |
 
-### Exemplo de saída — situação atual
+### Exemplo de saída: situação atual
 
 > **Região:** Centro
 > **Precipitação recente:** elevada em relação à média histórica da região
@@ -192,7 +210,7 @@ A IA tem propósito específico dentro do domínio: **transformar um conjunto gr
 > **Análise:** a convergência entre chuva acumulada acima do padrão local, histórico recorrente e presença de população exposta indica uma situação que merece atenção e verificação em campo.
 > _Fontes: CEMADEN (chuva, consulta em [data]); S2ID (ocorrências, 1991 a 2025); IBGE Censo 2022 (ocupação)._
 
-### Exemplo de saída — cenário previsto
+### Exemplo de saída: cenário previsto
 
 > **Região:** Centro
 > **Cenário previsto:** acumulado de 80 mm em 24 h, previsto para [data]
@@ -224,7 +242,7 @@ O impacto é **indireto e mediado**: a Pluvia melhora a informação disponível
 ### Quem é beneficiado, e de que forma
 
 **Equipes técnicas e Defesa Civil municipal**
-Visão consolidada do território sem o custo de reunir manualmente seis fontes distintas. Priorização de vistoria e verificação em campo apoiada em evidência comparável entre regiões, com antecedência em relação ao evento previsto.
+Visão consolidada do território sem o custo de reunir manualmente seis fontes distintas. Priorização de vistoria e verificação em campo apoiada em evidência comparável entre regiões, com antecedência em relação ao evento previsto, e alertas operacionais quando uma região passa a merecer atenção.
 
 **Gestores municipais**
 Priorização mais defensável de recursos escassos, como limpeza de drenagem, obra e campanha de comunicação, com base em histórico organizado em vez de critério circunstancial. Memória institucional que permanece entre gestões.
@@ -268,7 +286,7 @@ Análises rastreáveis, baseadas em dados públicos, podem ser verificadas por c
 
 ## 📚 Dados e referências
 
-Todas as fontes são institucionais e de dados oficiais. Cada uma sustenta um ponto específico da proposta:
+Todas as fontes são institucionais e de dados oficiais. Cada uma sustenta um ponto específico da proposta. O fichamento completo, com limitações de cada fonte, está em [`docs/referencias.md`](docs/referencias.md).
 
 **1. CEMADEN: Centro Nacional de Monitoramento e Alertas de Desastres Naturais (MCTI)**
 Monitoramento de áreas de risco, rede nacional de pluviômetros e publicação de cenários de risco geo-hidrológico considerando condições atuais e previsão de chuva.
@@ -318,7 +336,7 @@ Os filtros do Atlas Digital são rotulados por nome de tipo de desastre e não e
 
 ## 🚀 Objetivo
 
-**Geral.** Desenvolver uma plataforma distribuída que integre dados públicos sobre chuva observada e prevista, histórico de ocorrências e vulnerabilidade territorial, aplicando Inteligência Artificial para produzir análises contextuais de risco de alagamento, incluindo a leitura de cenários previstos, e que permita planejar e acompanhar as ações preventivas decorrentes dessas análises.
+**Geral.** Desenvolver uma plataforma distribuída que integre dados públicos sobre chuva observada e prevista, histórico de ocorrências, vulnerabilidade territorial e leituras de sensores de nível, aplicando Inteligência Artificial para produzir análises contextuais de risco de alagamento, incluindo a leitura de cenários previstos, e que permita planejar e acompanhar as ações preventivas decorrentes dessas análises.
 
 **Específicos**
 
@@ -327,7 +345,7 @@ Os filtros do Atlas Digital são rotulados por nome de tipo de desastre e não e
 3. Definir o modelo conceitual da solução e seu fluxo de informação.
 4. Delimitar o papel da IA como camada de interpretação, com limites explícitos, distinguindo interpretação de previsão de produção de previsão.
 5. Estabelecer critérios de avaliação da qualidade da informação produzida.
-6. _(etapas seguintes)_ Projetar e implementar a plataforma como sistema distribuído.
+6. Projetar e implementar a plataforma como sistema distribuído.
 
 ---
 
@@ -338,11 +356,13 @@ Os filtros do Atlas Digital são rotulados por nome de tipo de desastre e não e
 - Cadastro e consulta de regiões monitoradas.
 - Ingestão e acompanhamento de dados de chuva observada a partir de fontes públicas.
 - Ingestão periódica de previsão meteorológica oficial e associação às regiões monitoradas.
+- Ingestão de leituras de sensores de nível por contrato MQTT, com simulador na versão acadêmica.
 - Composição do **cenário previsto** por região, comparando o acumulado previsto ao padrão histórico local e às características do território.
 - Registro, validação e consulta de ocorrências.
 - Consolidação e visualização do histórico por região.
 - Composição de um panorama de risco contextual por região.
 - Sinalizações de atenção dirigidas aos perfis de usuário, disparadas tanto por condição observada quanto por cenário previsto.
+- Alertas operacionais internos aos usuários inscritos em cada região.
 - Planejamento de ações preventivas, com alocação de equipe, prazo e recursos.
 - Acompanhamento da execução até a confirmação em campo, com retorno ao histórico da região.
 - Análise contextual explicável com apoio de IA.
@@ -359,20 +379,19 @@ A previsão aumenta a pressão sobre essa operação: quando um cenário previst
 
 **Atualização de previsão.** Boletins meteorológicos são republicados e revisados ao longo do dia. Cada nova publicação precisa ser ingerida, associada às regiões, recompor o cenário previsto, atualizar os modelos de leitura dos painéis e eventualmente gerar nova sinalização, tudo sem bloquear quem está consultando o sistema. É um fluxo naturalmente assíncrono, com consistência eventual aceitável e defasagem mensurável entre a publicação na fonte e a visibilidade no painel.
 
-**Validação de uma ocorrência reportada.** Uma ocorrência observada em campo é registrada, passa por validação técnica, é incorporada ao histórico da região, altera o panorama de risco e dispara comunicação aos perfis interessados, podendo inclusive originar uma ação preventiva. Se a validação for revertida, o histórico, o panorama e a ação dela derivada precisam ser revertidos em conjunto.
+**Ingestão de sensores.** Dispositivos em campo publicam continuamente, podem ficar sem comunicação, reenviar leituras ou entregá-las fora de ordem. O sistema precisa descartar duplicatas, ordenar pelo horário da medição e declarar quando o dado de uma região deixa de ser confiável.
+
+**Validação de uma ocorrência reportada.** Uma ocorrência observada em campo é registrada, passa por validação técnica, é incorporada ao histórico da região, altera o panorama de risco e dispara comunicação aos perfis interessados, podendo inclusive originar uma ação preventiva.
 
 **Encerramento de uma ação em campo.** A confirmação de execução libera os recursos alocados, registra o resultado no histórico da região e atualiza o panorama, o que fecha o ciclo e alimenta a análise seguinte.
 
-Há ainda uma assimetria clara entre **escrita** (ingestão contínua de dados observados e previstos, registro de ocorrências, movimentação de ações) e **leitura** (painéis comparativos, consultas históricas, buscas por região), com exigências de desempenho e modelagem bastante diferentes de cada lado.
+Há ainda uma assimetria clara entre **escrita** (ingestão contínua de dados observados, previstos e de sensores, registro de ocorrências, movimentação de ações) e **leitura** (painéis comparativos, consultas históricas, buscas por região), com exigências de desempenho e modelagem bastante diferentes de cada lado.
 
-> A decomposição em serviços, os contratos, os padrões aplicados e as decisões arquiteturais serão definidos e justificados na **Parte 2**. Esta seção existe apenas para demonstrar que o domínio comporta essa complexidade.
+### Fora do escopo do projeto
 
-### Fora do escopo desta etapa
-
-- Arquitetura técnica, decomposição em serviços, contratos de API e modelo de dados.
-- Implementação, instrumentação física ou coleta própria de dados.
+- Instalação de sensores físicos. A ingestão segue contrato que permite a substituição do simulador por dispositivo real.
 - Modelagem meteorológica ou hidrológica própria.
-- Integração com sistemas oficiais de alerta.
+- Alertas à população e integração com sistemas oficiais de alerta.
 
 ### Premissas e limitações reconhecidas
 
@@ -380,9 +399,54 @@ Há ainda uma assimetria clara entre **escrita** (ingestão contínua de dados o
 - A qualidade da análise é limitada pela cobertura e atualização das fontes públicas.
 - A qualidade do cenário previsto é limitada pela qualidade e pela granularidade da previsão oficial. Previsões são revisadas e podem não se confirmar, e a plataforma não assume responsabilidade por elas.
 - A granularidade espacial disponível pode ser municipal, e não por bairro. Nesse caso, a diferenciação entre regiões passa a vir do território e do histórico, e não do volume previsto, limitação que será declarada na própria interface.
+- Na versão acadêmica, as leituras de nível d'água vêm de simulador e não representam medições reais.
 - O sub-registro de ocorrências é problema conhecido em bases de desastres e afeta qualquer leitura histórica, especialmente a comparação com eventos semelhantes prevista para a camada 2.
 - Regiões com menor densidade de monitoramento terão análises menos precisas, limitação que será declarada na própria interface.
-- Recorte territorial piloto restrito a **Lavras/MG**, escolhido por ser o município da instituição, ter porte tratável e possuir registro histórico no Atlas Digital. A restrição é intencional, para permitir validação de qualidade antes de qualquer generalização. Dessa forma, começamos com mais qualidade.
+- Recorte territorial piloto restrito a **Lavras/MG**, escolhido por ser o município da instituição, ter porte tratável e possuir registro histórico no Atlas Digital. A restrição é intencional, para permitir validação de qualidade antes de qualquer generalização.
+
+---
+
+## 🏗️ Arquitetura
+
+A documentação completa da Parte 2 está em [`docs/arquitetura`](docs/arquitetura/README.md), e os contratos OpenAPI de cada serviço em [`docs/api`](docs/api).
+
+### Serviços
+
+| Serviço | Responsabilidade |
+| ------- | ---------------- |
+| **Território** | Regiões, características, vulnerabilidade e ocorrências |
+| **Monitoramento** | Chuva observada, previsão, níveis da ANA e sensores |
+| **Risco** | Panorama por região, cenário previsto e sinalizações. Aplica CQRS |
+| **Operações** | Ações preventivas. Orquestrador da SAGA |
+| **Equipes** | Equipes de campo e reservas por turno |
+| **Frota** | Veículos, equipamentos, manutenção e reservas por turno |
+| **Notificações** | Alertas operacionais internos |
+| **Análise** | Sínteses explicáveis e consultas à base de conhecimento (IA) |
+
+Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outro para o app mobile.
+
+### Padrões aplicados
+
+| Padrão | Onde | Documento |
+| ------ | ---- | --------- |
+| SAGA orquestrada | Abertura de ação preventiva: Operações, Equipes e Frota | [06-saga.md](docs/arquitetura/06-saga.md) |
+| CQRS | Panorama de risco | [07-cqrs.md](docs/arquitetura/07-cqrs.md) |
+| Outbox transacional | Operações, e os demais serviços que publicam eventos de negócio | [05-dados.md](docs/arquitetura/05-dados.md) |
+| Database per service | Todos os serviços | [05-dados.md](docs/arquitetura/05-dados.md) |
+| HATEOAS | Recurso de ação preventiva | [02-api-rest.md](docs/arquitetura/02-api-rest.md) |
+| API Gateway e BFF | Borda | [03-gateway.md](docs/arquitetura/03-gateway.md), [04-bff.md](docs/arquitetura/04-bff.md) |
+
+### Tecnologias
+
+| Camada | Tecnologia |
+| ------ | ---------- |
+| Serviços e BFFs | NestJS (TypeScript) |
+| Serviço de Análise | Python, FastAPI e LangChain |
+| Bancos | PostgreSQL por serviço, com PostGIS, TimescaleDB e pgvector |
+| Mensageria | RabbitMQ, com plugin MQTT |
+| Gateway | Kong |
+| Identidade | Keycloak |
+| Clientes | React (web) e React Native com Expo (mobile) |
 
 ---
 
@@ -414,13 +478,33 @@ git config user.email "email-da-conta@github.com"
 
 ```text
 pluvia/
-├── README.md              # Este documento, proposta da Parte 1
+├── README.md                  # Este documento
 └── docs/
-    └── referencias.md     # Fichamento das fontes institucionais
-    └── logoPluvia.png     # Logo do projeto
+    ├── logoPluvia.png         # Logo do projeto
+    ├── referencias.md         # Fichamento das fontes institucionais
+    ├── arquitetura/           # Parte 2: decomposição, padrões e decisões
+    │   ├── README.md
+    │   ├── 01-decomposicao.md
+    │   ├── 02-api-rest.md
+    │   ├── 03-gateway.md
+    │   ├── 04-bff.md
+    │   ├── 05-dados.md
+    │   ├── 06-saga.md
+    │   ├── 07-cqrs.md
+    │   ├── 08-eventos.md
+    │   └── 09-decisoes.md
+    └── api/                   # Contratos OpenAPI
+        ├── territorio.yaml
+        ├── monitoramento.yaml
+        ├── risco.yaml
+        ├── operacoes.yaml
+        ├── equipes.yaml
+        ├── frota.yaml
+        ├── notificacoes.yaml
+        ├── analise.yaml
+        ├── bff-web.yaml
+        └── bff-mobile.yaml
 ```
-
-Os diagramas de arquitetura, as decisões técnicas e os contratos de API serão adicionados a `/docs` a partir da Parte 2, conforme forem produzidos.
 
 ---
 
