@@ -1,0 +1,461 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Território
+  version: 1.0.0
+  description: Regiões monitoradas, características, vulnerabilidade e ocorrências.
+servers:
+  - url: http://territorio:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs e pela Análise
+tags:
+  - name: Regioes
+  - name: Ocorrencias
+  - name: Importacoes
+
+paths:
+  /regioes:
+    get:
+      tags: [Regioes]
+      operationId: listarRegioes
+      summary: Lista regiões monitoradas
+      parameters:
+        - { name: municipio, in: query, schema: { type: string } }
+        - { name: uf, in: query, schema: { type: string, minLength: 2, maxLength: 2 } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de regiões
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaRegioes' }
+    post:
+      tags: [Regioes]
+      operationId: cadastrarRegiao
+      summary: Cadastra uma região
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaRegiao' }
+      responses:
+        '201':
+          description: Região criada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Regiao' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '409': { $ref: '#/components/responses/Conflito' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /regioes/localizacao:
+    get:
+      tags: [Regioes]
+      operationId: localizarRegiao
+      summary: Encontra a região que contém uma coordenada
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lng, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+      responses:
+        '200':
+          description: Região encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Regiao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /regioes/{regiaoId}:
+    parameters:
+      - $ref: '#/components/parameters/RegiaoId'
+    get:
+      tags: [Regioes]
+      operationId: obterRegiao
+      summary: Obtém uma região
+      responses:
+        '200':
+          description: Região encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Regiao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    patch:
+      tags: [Regioes]
+      operationId: atualizarRegiao
+      summary: Atualiza atributos cadastrais de uma região
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AtualizacaoRegiao' }
+      responses:
+        '200':
+          description: Região atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Regiao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /regioes/{regiaoId}/vulnerabilidade:
+    parameters:
+      - $ref: '#/components/parameters/RegiaoId'
+    get:
+      tags: [Regioes]
+      operationId: obterVulnerabilidade
+      summary: Indicadores de vulnerabilidade da região
+      responses:
+        '200':
+          description: Indicadores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vulnerabilidade' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Regioes]
+      operationId: definirVulnerabilidade
+      summary: Define os indicadores de vulnerabilidade da região
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Vulnerabilidade' }
+      responses:
+        '200':
+          description: Indicadores atualizados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vulnerabilidade' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /ocorrencias:
+    get:
+      tags: [Ocorrencias]
+      operationId: listarOcorrencias
+      summary: Lista ocorrências
+      parameters:
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: situacao, in: query, schema: { $ref: '#/components/schemas/SituacaoOcorrencia' } }
+        - { name: origem, in: query, schema: { $ref: '#/components/schemas/OrigemOcorrencia' } }
+        - { name: desde, in: query, schema: { type: string, format: date } }
+        - { name: ate, in: query, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de ocorrências
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaOcorrencias' }
+    post:
+      tags: [Ocorrencias]
+      operationId: reportarOcorrencia
+      summary: Reporta uma ocorrência observada em campo
+      description: A ocorrência nasce REPORTADA e só entra no panorama de risco depois de validada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaOcorrencia' }
+      responses:
+        '201':
+          description: Ocorrência registrada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ocorrencia' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /ocorrencias/{ocorrenciaId}:
+    parameters:
+      - $ref: '#/components/parameters/OcorrenciaId'
+    get:
+      tags: [Ocorrencias]
+      operationId: obterOcorrencia
+      summary: Obtém uma ocorrência
+      responses:
+        '200':
+          description: Ocorrência encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ocorrencia' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /ocorrencias/{ocorrenciaId}/validacao:
+    parameters:
+      - $ref: '#/components/parameters/OcorrenciaId'
+    post:
+      tags: [Ocorrencias]
+      operationId: validarOcorrencia
+      summary: Registra a decisão técnica sobre uma ocorrência reportada
+      description: Permitido para ocorrências REPORTADA. Publica OcorrenciaValidada ou OcorrenciaDescartada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisaoValidacao' }
+      responses:
+        '200':
+          description: Decisão registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ocorrencia' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /importacoes:
+    post:
+      tags: [Importacoes]
+      operationId: iniciarImportacao
+      summary: Importa o histórico oficial de ocorrências
+      description: Processamento assíncrono de arquivo exportado do Atlas Digital de Desastres.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NovaImportacao' }
+      responses:
+        '202':
+          description: Importação aceita
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Importacao' }
+        '400': { $ref: '#/components/responses/RequisicaoInvalida' }
+
+  /importacoes/{importacaoId}:
+    get:
+      tags: [Importacoes]
+      operationId: obterImportacao
+      summary: Acompanha uma importação
+      parameters:
+        - { name: importacaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Situação da importação
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Importacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  parameters:
+    RegiaoId:
+      name: regiaoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OcorrenciaId:
+      name: ocorrenciaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Tamanho:
+      name: tamanho
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição malformada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Conflito com o estado atual ou violação de unicidade
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    Poligono:
+      type: object
+      description: Geometria GeoJSON
+      required: [type, coordinates]
+      properties:
+        type: { type: string, enum: [Polygon, MultiPolygon] }
+        coordinates: { type: array, items: {} }
+
+    Ponto:
+      type: object
+      description: Ponto GeoJSON, na ordem longitude, latitude
+      required: [type, coordinates]
+      properties:
+        type: { type: string, enum: [Point] }
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: number }
+
+    Caracteristicas:
+      type: object
+      properties:
+        areaKm2: { type: number }
+        proximidadeCursoAgua: { type: boolean }
+        declividadeMediaPct: { type: number }
+        tipoOcupacao: { type: string, enum: [RESIDENCIAL, COMERCIAL, MISTA, INDUSTRIAL, RURAL] }
+
+    NovaRegiao:
+      type: object
+      required: [codigo, nome, municipio, uf, geometria]
+      properties:
+        codigo: { type: string, example: LAV-CENTRO }
+        nome: { type: string, example: Centro }
+        municipio: { type: string, example: Lavras }
+        uf: { type: string, example: MG }
+        geometria: { $ref: '#/components/schemas/Poligono' }
+        caracteristicas: { $ref: '#/components/schemas/Caracteristicas' }
+
+    AtualizacaoRegiao:
+      type: object
+      properties:
+        nome: { type: string }
+        geometria: { $ref: '#/components/schemas/Poligono' }
+        caracteristicas: { $ref: '#/components/schemas/Caracteristicas' }
+
+    Regiao:
+      allOf:
+        - $ref: '#/components/schemas/NovaRegiao'
+        - type: object
+          required: [id, criadaEm]
+          properties:
+            id: { type: string, format: uuid }
+            criadaEm: { type: string, format: date-time }
+            atualizadaEm: { type: string, format: date-time }
+
+    PaginaRegioes:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Regiao' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    Vulnerabilidade:
+      type: object
+      required: [populacao, indice, fonte, referencia]
+      properties:
+        regiaoId: { type: string, format: uuid, readOnly: true }
+        populacao: { type: integer, minimum: 0 }
+        domicilios: { type: integer, minimum: 0 }
+        possuiAglomeradoSubnormal: { type: boolean }
+        indice:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Índice composto de vulnerabilidade, de 0 a 1
+        fonte: { type: string, example: IBGE Censo 2022 }
+        referencia: { type: string, example: '2022' }
+        atualizadaEm: { type: string, format: date-time, readOnly: true }
+
+    TipoOcorrencia:
+      type: string
+      enum: [ALAGAMENTO, ENXURRADA, INUNDACAO]
+
+    OrigemOcorrencia:
+      type: string
+      enum: [S2ID, CAMPO]
+
+    SituacaoOcorrencia:
+      type: string
+      enum: [REPORTADA, VALIDADA, DESCARTADA]
+
+    NovaOcorrencia:
+      type: object
+      required: [tipo, ocorridaEm, localizacao]
+      properties:
+        tipo: { $ref: '#/components/schemas/TipoOcorrencia' }
+        ocorridaEm: { type: string, format: date-time }
+        localizacao: { $ref: '#/components/schemas/Ponto' }
+        descricao: { type: string, maxLength: 1000 }
+
+    Ocorrencia:
+      type: object
+      required: [id, regiaoId, tipo, origem, situacao, ocorridaEm]
+      properties:
+        id: { type: string, format: uuid }
+        regiaoId: { type: string, format: uuid }
+        tipo: { $ref: '#/components/schemas/TipoOcorrencia' }
+        origem: { $ref: '#/components/schemas/OrigemOcorrencia' }
+        situacao: { $ref: '#/components/schemas/SituacaoOcorrencia' }
+        ocorridaEm: { type: string, format: date-time }
+        localizacao: { $ref: '#/components/schemas/Ponto' }
+        descricao: { type: string, nullable: true }
+        afetados: { type: integer, nullable: true }
+        protocoloS2id: { type: string, nullable: true }
+        reportadaPor: { type: string, format: uuid, nullable: true }
+        validacao:
+          type: object
+          nullable: true
+          properties:
+            decididaPor: { type: string, format: uuid }
+            decididaEm: { type: string, format: date-time }
+            justificativa: { type: string }
+
+    PaginaOcorrencias:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Ocorrencia' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    DecisaoValidacao:
+      type: object
+      required: [decisao, justificativa]
+      properties:
+        decisao: { type: string, enum: [VALIDAR, DESCARTAR] }
+        justificativa: { type: string, minLength: 5, maxLength: 500 }
+
+    NovaImportacao:
+      type: object
+      required: [fonte, arquivoUrl]
+      properties:
+        fonte: { type: string, enum: [ATLAS_DIGITAL] }
+        arquivoUrl: { type: string, format: uri }
+        municipio: { type: string }
+        uf: { type: string }
+
+    Importacao:
+      type: object
+      required: [id, situacao]
+      properties:
+        id: { type: string, format: uuid }
+        fonte: { type: string }
+        situacao: { type: string, enum: [AGUARDANDO, PROCESSANDO, CONCLUIDA, FALHOU] }
+        registrosLidos: { type: integer }
+        registrosImportados: { type: integer }
+        erros: { type: array, items: { type: string } }
+        iniciadaEm: { type: string, format: date-time }
+        concluidaEm: { type: string, format: date-time, nullable: true }
