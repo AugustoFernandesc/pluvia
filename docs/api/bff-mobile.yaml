@@ -267,10 +267,17 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problema' }
     LimiteExcedido:
-      description: Limite de requisições excedido, emitido pelo gateway
+      description: Limite de requisições excedido; resposta emitida pelo gateway antes de alcançar o BFF
       content:
-        application/problem+json:
-          schema: { $ref: '#/components/schemas/Problema' }
+        application/json:
+          schema:
+            type: object
+            description: Corpo nativo do plugin rate-limiting do Kong
+            properties:
+              message: { type: string }
+          examples:
+            limiteExcedido:
+              value: { message: API rate limit exceeded }
     Indisponivel:
       description: Serviço de origem indisponível
       content:
