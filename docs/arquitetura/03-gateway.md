@@ -190,7 +190,7 @@ No Kubernetes, o **Ingress** recebe o tráfego externo do cluster e encaminha tu
 
 ## Referências
 
-- [Kong — configuração declarativa em modo DB-less](https://developer.konghq.com/gateway/db-less-mode/).
-- [Kong — plugin JWT, chave pública RSA e identificação pelo claim `iss`](https://developer.konghq.com/plugins/jwt/).
-- [Kong — CLI `kong config parse`](https://developer.konghq.com/gateway/cli/reference/).
-- [Kong — implementação das respostas do plugin JWT](https://github.com/Kong/kong/blob/master/kong/plugins/jwt/handler.lua).
+- [Kong: configuração declarativa em modo DB-less](https://developer.konghq.com/gateway/db-less-mode/).
+- [Kong: plugin JWT, chave pública RSA e identificação pelo claim `iss`](https://developer.konghq.com/plugins/jwt/).
+- [Kong: CLI `kong config parse`](https://developer.konghq.com/gateway/cli/reference/).
+- [Kong: implementação das respostas do plugin JWT](https://github.com/Kong/kong/blob/master/kong/plugins/jwt/handler.lua).
