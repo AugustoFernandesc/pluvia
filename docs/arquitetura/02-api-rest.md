@@ -60,7 +60,9 @@ A distinção entre `400` e `422` é deliberada. `400` indica que o servidor nã
 
 ### Formato de erro
 
-Todos os erros seguem a RFC 7807, com `Content-Type: application/problem+json`:
+Todos os erros emitidos pelos serviços e pelos BFFs seguem a RFC 7807, com `Content-Type: application/problem+json`. A exceção são os erros emitidos pelo próprio gateway, `401` e `429`, que chegam no formato nativo dos plugins do Kong (`{"message": "..."}`), porque a requisição é recusada antes de alcançar qualquer serviço. Os contratos dos BFFs documentam esse formato.
+
+Exemplo de erro emitido por um serviço:
 
 ```json
 {
