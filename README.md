@@ -23,12 +23,12 @@
 
 ## 👥 Equipe
 
-| Integrante | GitHub |
-| ---------- | ------ |
-| Augusto Fernandes Carvalho | [@AugustoFernandesc](https://github.com/AugustoFernandesc) |
-| Alexandre Bortone | [@alebortone](https://github.com/alebortone) |
-| Lucas Marcelino Neves | [@lucasnevesdv](https://github.com/lucasnevesdv) |
-| Mark Leite Sá | [@markesapucai](https://github.com/markesapucai) |
+| Integrante | GitHub | Responsabilidade na Parte 3 |
+| ---------- | ------ | --------------------------- |
+| Augusto Fernandes Carvalho | [@AugustoFernandesc](https://github.com/AugustoFernandesc) | Território, Monitoramento e Notificações. RabbitMQ com plugin MQTT, filas e exchanges |
+| Alexandre Bortone | [@alebortone](https://github.com/alebortone) | Operações, Equipes e Frota. Esqueleto padrão dos serviços NestJS e `docker-compose.yml` base, com redes e volumes |
+| Lucas Marcelino Neves | [@lucasnevesdv](https://github.com/lucasnevesdv) | BFF Web e BFF Mobile. Keycloak, Kong e Ingress |
+| Mark Leite Sá | [@markesapucai](https://github.com/markesapucai) | Risco e Análise. ConfigMaps, Secrets e demonstração de escalonamento |
 
 ---
 
