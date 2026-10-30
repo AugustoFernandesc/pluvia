@@ -513,7 +513,26 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 
 ## ⚙️ Execução do projeto
 
-> Ainda não há código nesta etapa. As instruções completas para subir o sistema do zero serão publicadas nesta seção a partir da Parte 3, junto com os arquivos de containerização.
+Requisito: Docker com Compose v2.20 ou superior.
+
+Cada componente tem o próprio `.env`, que não é versionado. Crie-o a partir do `.env.example` e troque a senha antes de subir:
+
+```bash
+cp services/operacoes/.env.example services/operacoes/.env
+cp infra/rabbitmq/.env.example infra/rabbitmq/.env
+docker compose up -d --build
+docker compose ps
+```
+
+O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Por enquanto sobem o serviço de Operações, o banco dele e o RabbitMQ, que devem aparecer como `healthy`. Os serviços não publicam porta no host. Para conferir o `/health`:
+
+```bash
+docker compose exec operacoes wget -qO- 127.0.0.1:3000/health
+```
+
+Para derrubar, use `docker compose down`. O banco de cada serviço fica num volume nomeado, então os dados permanecem. Para apagá-los, use `docker compose down -v`.
+
+Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-nestjs/README.md).
 
 ---
 

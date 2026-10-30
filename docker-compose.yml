@@ -1,0 +1,9 @@
+name: pluvia
+
+include:
+  - services/operacoes/compose.yaml
+  - infra/rabbitmq/compose.yaml
+
+networks:
+  aplicacao:
+  mensageria:
