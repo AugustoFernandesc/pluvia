@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: territorio
+  labels:
+    app.kubernetes.io/name: territorio
+spec:
+  selector:
+    app.kubernetes.io/name: territorio
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
