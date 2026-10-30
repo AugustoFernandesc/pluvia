@@ -1,0 +1,25 @@
+services:
+  rabbitmq:
+    build: .
+    image: pluvia/rabbitmq:local
+    hostname: rabbitmq
+    env_file: .env
+    ports:
+      - "1883:1883"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-dados:/var/lib/rabbitmq
+    networks:
+      - mensageria
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  rabbitmq-dados:
+
+networks:
+  mensageria:

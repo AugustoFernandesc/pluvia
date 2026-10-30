@@ -93,11 +93,22 @@ Documento de apoio ao README. Enquanto o README apresenta cada fonte e o que ela
 
 ---
 
-## 5. INMET _(etapa posterior)_
+## 5. INMET
 
 🔗 https://portal.inmet.gov.br
 
-Dados de estações meteorológicas automáticas e convencionais, previsões e boletins. A incorporação está prevista para etapa posterior. A fonte é citada para registrar o caminho previsto, sem sustentar nenhuma afirmação da Parte 1.
+**O que oferece**
+- Previsão meteorológica oficial, com boletins de acumulado previsto por município.
+- Dados observados das estações meteorológicas automáticas e convencionais.
+
+**Limitações a reconhecer**
+- A granularidade da previsão costuma ser municipal, não por bairro. Quando for o caso, o mesmo volume previsto vale para todas as regiões do município, e a diferenciação entre elas passa a vir do território e do histórico.
+- Boletins são revisados ao longo do dia. Toda análise baseada em previsão registra o horário de emissão do boletim usado.
+- Previsões podem não se confirmar. A Pluvia consome a previsão como evidência e não assume responsabilidade por ela.
+
+**Como será usada.** Fonte do cenário previsto por região, que dá antecedência às sinalizações de atenção e ao planejamento de ações preventivas.
+
+**Consultado em:** 17/09/2026
 
 ---
 

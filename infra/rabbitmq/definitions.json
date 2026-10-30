@@ -1,0 +1,576 @@
+{
+  "vhosts": [
+    {
+      "name": "pluvia"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "pluvia.eventos",
+      "vhost": "pluvia",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "pluvia.comandos",
+      "vhost": "pluvia",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "pluvia.dlx",
+      "vhost": "pluvia",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "monitoramento.regioes",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "operacoes.regioes",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "equipes.eventos",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "frota.eventos",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "risco.avaliador",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "risco.projetor",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "notificacoes.eventos",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "equipes.comandos",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "frota.comandos",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "operacoes.respostas",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "monitoramento.sensores",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "pluvia.dlq",
+      "vhost": "pluvia",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "monitoramento.regioes",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.cadastrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "monitoramento.regioes",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "operacoes.regioes",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.cadastrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "operacoes.regioes",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "equipes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.confirmada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "equipes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.concluida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "equipes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.cancelada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "frota.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.confirmada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "frota.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.concluida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "frota.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.cancelada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.cadastrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "territorio.vulnerabilidade.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "territorio.ocorrencia.validada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "territorio.ocorrencia.descartada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.acumulado.atualizado",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.previsao.publicada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.nivel.atualizado",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.sensor.inativo",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.confirmada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.iniciada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.concluida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.avaliador",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.cancelada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.cadastrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "territorio.vulnerabilidade.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "territorio.ocorrencia.validada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "territorio.ocorrencia.descartada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.acumulado.atualizado",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.previsao.publicada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.nivel.atualizado",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.sensor.inativo",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.confirmada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.iniciada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.concluida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.cancelada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "risco.sinalizacao.emitida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "risco.sinalizacao.reconhecida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "risco.projetor",
+      "destination_type": "queue",
+      "routing_key": "risco.sinalizacao.encerrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.cadastrada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "territorio.regiao.atualizada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "territorio.ocorrencia.reportada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "risco.sinalizacao.emitida",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "monitoramento.sensor.inativo",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.confirmada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.rejeitada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.eventos",
+      "vhost": "pluvia",
+      "destination": "notificacoes.eventos",
+      "destination_type": "queue",
+      "routing_key": "operacoes.acao.cancelada",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.comandos",
+      "vhost": "pluvia",
+      "destination": "equipes.comandos",
+      "destination_type": "queue",
+      "routing_key": "equipes.comandos",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.comandos",
+      "vhost": "pluvia",
+      "destination": "frota.comandos",
+      "destination_type": "queue",
+      "routing_key": "frota.comandos",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.comandos",
+      "vhost": "pluvia",
+      "destination": "operacoes.respostas",
+      "destination_type": "queue",
+      "routing_key": "operacoes.respostas",
+      "arguments": {}
+    },
+    {
+      "source": "amq.topic",
+      "vhost": "pluvia",
+      "destination": "monitoramento.sensores",
+      "destination_type": "queue",
+      "routing_key": "pluvia.sensores.*.leituras",
+      "arguments": {}
+    },
+    {
+      "source": "pluvia.dlx",
+      "vhost": "pluvia",
+      "destination": "pluvia.dlq",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "pluvia",
+      "name": "mensagens-mortas",
+      "pattern": "^(?!pluvia\\.dlq$).*",
+      "apply-to": "queues",
+      "priority": 0,
+      "definition": {
+        "dead-letter-exchange": "pluvia.dlx"
+      }
+    }
+  ]
+}

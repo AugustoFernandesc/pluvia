@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Análise
+  version: 1.0.0
+  description: |
+    Camada de IA. Sínteses explicáveis da situação e do cenário previsto de uma região, e consultas à base de conhecimento por RAG.
+    Implementado em Python com FastAPI e LangChain. Mecanismos de resiliência, avaliação do RAG e análise de custo serão detalhados na Parte 4.
+servers:
+  - url: http://analise:8000/v1
+    description: Endereço interno, acessível apenas pelo BFF Web
+tags:
+  - name: Analises
+  - name: Consultas
+  - name: BaseConhecimento
+
+paths:
+  /analises:
+    post:
+      tags: [Analises]
+      operationId: gerarAnalise
+      summary: Gera síntese explicável para uma região
+      description: |
+        O modelo consulta dados atuais de Risco, Território e Monitoramento por meio de ferramentas.
+        Toda saída cita as fontes e a data de referência dos dados usados.
+        Quando o provedor de LLM está indisponível, a resposta pode vir de cache ou de fallback, indicado no campo origem.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PedidoAnalise' }
+      responses:
+        '200':
+          description: Análise gerada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Analise' }
+        '404':
+          description: Região inexistente
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '503':
+          description: Provedor de LLM indisponível e sem resposta em cache ou fallback
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '504':
+          description: Tempo limite excedido na geração
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /consultas:
+    post:
+      tags: [Consultas]
+      operationId: consultarBase
+      summary: Pergunta à base de conhecimento sobre prevenção e resposta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pergunta]
+              properties:
+                pergunta: { type: string, minLength: 5, maxLength: 1000 }
+                regiaoId:
+                  type: string
+                  format: uuid
+                  description: Quando informado, a resposta considera o contexto atual da região
+      responses:
+        '200':
+          description: Resposta com trechos recuperados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RespostaConsulta' }
+        '503':
+          description: Provedor de LLM indisponível
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /documentos:
+    get:
+      tags: [BaseConhecimento]
+      operationId: listarDocumentos
+      summary: Documentos da base de conhecimento
+      responses:
+        '200':
+          description: Documentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Documento' }
+    post:
+      tags: [BaseConhecimento]
+      operationId: ingerirDocumento
+      summary: Adiciona documento à base de conhecimento
+      description: Assíncrono. O documento é dividido em trechos, convertido em embeddings e indexado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titulo, origem, url]
+              properties:
+                titulo: { type: string }
+                origem: { type: string, example: Manual de Defesa Civil }
+                url: { type: string, format: uri }
+      responses:
+        '202':
+          description: Ingestão iniciada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Documento' }
+
+components:
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    PedidoAnalise:
+      type: object
+      required: [regiaoId, tipo]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        tipo: { type: string, enum: [SITUACAO_ATUAL, CENARIO_PREVISTO] }
+
+    Fonte:
+      type: object
+      required: [nome, referencia]
+      properties:
+        nome: { type: string, example: CEMADEN }
+        referencia: { type: string, example: 'chuva, consulta em 2026-10-19T14:00:00Z' }
+
+    Analise:
+      type: object
+      required: [regiaoId, tipo, sintese, fontes, origem, geradaEm]
+      properties:
+        id: { type: string, format: uuid }
+        regiaoId: { type: string, format: uuid }
+        tipo: { type: string, enum: [SITUACAO_ATUAL, CENARIO_PREVISTO] }
+        sintese: { type: string }
+        fontes:
+          type: array
+          items: { $ref: '#/components/schemas/Fonte' }
+        origem:
+          type: string
+          enum: [LLM, CACHE, FALLBACK]
+          description: FALLBACK indica síntese montada por regras, sem o modelo de linguagem
+        modelo: { type: string, nullable: true }
+        latenciaMs: { type: integer }
+        geradaEm: { type: string, format: date-time }
+
+    RespostaConsulta:
+      type: object
+      required: [resposta, trechos]
+      properties:
+        resposta: { type: string }
+        trechos:
+          type: array
+          items:
+            type: object
+            properties:
+              documentoId: { type: string, format: uuid }
+              titulo: { type: string }
+              trecho: { type: string }
+              similaridade: { type: number, minimum: 0, maximum: 1 }
+        origem: { type: string, enum: [LLM, CACHE] }
+
+    Documento:
+      type: object
+      required: [id, titulo, situacao]
+      properties:
+        id: { type: string, format: uuid }
+        titulo: { type: string }
+        origem: { type: string }
+        url: { type: string, format: uri }
+        situacao: { type: string, enum: [PROCESSANDO, INDEXADO, FALHOU] }
+        trechos: { type: integer }
+        indexadoEm: { type: string, format: date-time, nullable: true }

@@ -9,14 +9,26 @@
 
 ---
 
+## ⭐ Destaque da Parte 2: SAGA
+
+**Abertura de ação preventiva**, uma transação que atravessa três serviços: **Operações** registra a ação, **Equipes** reserva a equipe e **Frota** reserva o veículo. Se uma reserva falhar, as anteriores são desfeitas por compensação.
+
+- **Orquestrada**, com Operações como orquestrador e justificativa frente à coreografada.
+- Passos T1 a T6 com compensações definidas, ponto de não retorno em T4 e idempotência por `sagaId`.
+- Caminho feliz e dois cenários de falha com compensação (sem veículo disponível e timeout), em diagramas de sequência.
+
+📄 Documento completo: [**docs/arquitetura/06-saga.md**](docs/arquitetura/06-saga.md)
+
+---
+
 ## 👥 Equipe
 
-| Integrante | GitHub |
-| ---------- | ------ |
-| Augusto Fernandes Carvalho | [@AugustoFernandesc](https://github.com/AugustoFernandesc) |
-| Alexandre Bortone | [@alebortone](https://github.com/alebortone) |
-| Lucas Marcelino Neves | [@lucasnevesdv](https://github.com/lucasnevesdv) |
-| Mark Leite Sá | [@markesapucai](https://github.com/markesapucai) |
+| Integrante | GitHub | Responsabilidade na Parte 3 |
+| ---------- | ------ | --------------------------- |
+| Augusto Fernandes Carvalho | [@AugustoFernandesc](https://github.com/AugustoFernandesc) | Território, Monitoramento e Notificações. RabbitMQ com plugin MQTT, filas e exchanges |
+| Alexandre Bortone | [@alebortone](https://github.com/alebortone) | Operações, Equipes e Frota. Esqueleto padrão dos serviços NestJS e `docker-compose.yml` base, com redes e volumes |
+| Lucas Marcelino Neves | [@lucasnevesdv](https://github.com/lucasnevesdv) | BFF Web e BFF Mobile. Keycloak, Kong e Ingress |
+| Mark Leite Sá | [@markesapucai](https://github.com/markesapucai) | Risco e Análise. ConfigMaps, Secrets e demonstração de escalonamento |
 
 ---
 
@@ -410,6 +422,55 @@ Há ainda uma assimetria clara entre **escrita** (ingestão contínua de dados o
 
 A documentação completa da Parte 2 está em [`docs/arquitetura`](docs/arquitetura/README.md), e os contratos OpenAPI de cada serviço em [`docs/api`](docs/api).
 
+```mermaid
+flowchart TB
+    WEB["Painel web<br/>React"] --> GW
+    MOB["App mobile<br/>React Native"] --> GW
+    GW["API Gateway<br/>Kong: rotas, JWT, rate limit"]
+    KC["Keycloak<br/>emite JWT"]
+    GW --> KC
+    GW --> BW["BFF Web"]
+    GW --> BM["BFF Mobile"]
+
+    subgraph Dominio["Serviços de domínio"]
+        TER["Território"] --- DB1[("PostGIS")]
+        MON["Monitoramento"] --- DB2[("TimescaleDB")]
+        RIS["Risco<br/>CQRS"] --- DB3[("Postgres escrita")]
+        RIS --- DB3b[("Postgres leitura")]
+        OPE["Operações<br/>orquestrador da SAGA"] --- DB4[("Postgres + outbox")]
+        EQU["Equipes"] --- DB5[("Postgres + outbox")]
+        FRO["Frota"] --- DB6[("Postgres + outbox")]
+    end
+
+    subgraph Apoio["Serviços de apoio"]
+        NOT["Notificações"] --- DB7[("Postgres")]
+        ANL["Análise IA<br/>FastAPI + LangChain"] --- DB8[("pgvector")]
+    end
+
+    BW --> TER & RIS & OPE & EQU & FRO & NOT & ANL
+    BM --> TER & RIS & OPE & NOT
+    ANL -. "leitura HTTP" .-> RIS & TER & MON
+
+    MQ[("RabbitMQ<br/>pluvia.eventos, pluvia.comandos")]
+    SENS["Sensores<br/>simulador MQTT"] -- MQTT --> MQ
+    TER & MON & RIS & OPE & EQU & FRO <-. "eventos e comandos" .-> MQ
+    NOT <-. "eventos" .-> MQ
+```
+
+Setas contínuas são HTTP síncrono. Linhas pontilhadas passam pelo broker. O gateway só conhece os BFFs; nenhum serviço de domínio é exposto para fora.
+
+### Gateway e broker não são a mesma coisa
+
+| | API Gateway (Kong) | RabbitMQ |
+| - | - | - |
+| **Tráfego** | Norte-sul: de fora do sistema para dentro | Leste-oeste: de um serviço para outro |
+| **Comunicação** | HTTP síncrono: o cliente espera a resposta | Mensagens assíncronas: o produtor não espera o consumidor |
+| **Quem fala com ele** | Painel web e app mobile | Serviços internos e sensores |
+| **Papel** | Ponto único de entrada, autenticação, limite de requisições, roteamento para os BFFs | Entrega eventos a vários assinantes e comandos da SAGA a um destinatário, com reentrega e fila de mensagens mortas |
+| **Se cair** | Clientes ficam sem acesso | Mensagens ficam na outbox dos serviços que a usam e são publicadas quando o broker voltar; os clientes continuam sendo atendidos |
+
+O RabbitMQ não faz o papel de gateway porque não recebe requisições de clientes, não valida JWT e não devolve resposta a quem chamou. Ele desacopla os serviços no tempo: Operações publica `ReservarEquipe` e segue, mesmo que Equipes esteja fora do ar naquele instante. Detalhes em [03-gateway.md](docs/arquitetura/03-gateway.md) e [08-eventos.md](docs/arquitetura/08-eventos.md).
+
 ### Serviços
 
 | Serviço | Responsabilidade |
@@ -452,7 +513,26 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 
 ## ⚙️ Execução do projeto
 
-> Ainda não há código nesta etapa. As instruções completas para subir o sistema do zero serão publicadas nesta seção a partir da Parte 3, junto com os arquivos de containerização.
+Requisito: Docker com Compose v2.20 ou superior.
+
+Cada componente tem o próprio `.env`, que não é versionado. Crie-o a partir do `.env.example` e troque a senha antes de subir:
+
+```bash
+cp services/operacoes/.env.example services/operacoes/.env
+cp infra/rabbitmq/.env.example infra/rabbitmq/.env
+docker compose up -d --build
+docker compose ps
+```
+
+O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Por enquanto sobem o serviço de Operações, o banco dele e o RabbitMQ, que devem aparecer como `healthy`. Os serviços não publicam porta no host. Para conferir o `/health`:
+
+```bash
+docker compose exec operacoes wget -qO- 127.0.0.1:3000/health
+```
+
+Para derrubar, use `docker compose down`. O banco de cada serviço fica num volume nomeado, então os dados permanecem. Para apagá-los, use `docker compose down -v`.
+
+Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-nestjs/README.md).
 
 ---
 

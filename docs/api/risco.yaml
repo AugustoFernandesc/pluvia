@@ -1,0 +1,385 @@
+openapi: 3.0.3
+info:
+  title: Pluvia · Risco
+  version: 1.0.0
+  description: |
+    Panorama por região, cenário previsto e sinalizações de atenção.
+    Aplica CQRS: as rotas da tag Consultas leem do modelo de leitura, atualizado por projeção com defasagem de até 30 s.
+    As rotas da tag Comandos alteram o modelo de escrita.
+servers:
+  - url: http://risco:3000/v1
+    description: Endereço interno, acessível apenas pelos BFFs e pela Análise
+tags:
+  - name: Consultas
+    description: Modelo de leitura
+  - name: Comandos
+    description: Modelo de escrita
+  - name: Sinalizacoes
+
+paths:
+  /panoramas:
+    get:
+      tags: [Consultas]
+      operationId: listarPanoramas
+      summary: Lista regiões com nível de atenção, ordenadas pelo mais alto
+      parameters:
+        - { name: municipio, in: query, schema: { type: string } }
+        - { name: nivelMinimo, in: query, schema: { $ref: '#/components/schemas/NivelAtencao' } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de resumos de panorama
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaResumos' }
+
+  /panoramas/{regiaoId}:
+    get:
+      tags: [Consultas]
+      operationId: obterPanorama
+      summary: Panorama completo de uma região
+      parameters:
+        - $ref: '#/components/parameters/RegiaoId'
+      responses:
+        '200':
+          description: Panorama da região
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Panorama' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /panoramas/{regiaoId}/cenario-previsto:
+    get:
+      tags: [Consultas]
+      operationId: obterCenarioPrevisto
+      summary: Leitura da previsão vigente no contexto da região
+      parameters:
+        - $ref: '#/components/parameters/RegiaoId'
+      responses:
+        '200':
+          description: Cenário previsto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CenarioPrevisto' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /regioes/{regiaoId}/parametros:
+    parameters:
+      - $ref: '#/components/parameters/RegiaoId'
+    get:
+      tags: [Comandos]
+      operationId: obterParametros
+      summary: Parâmetros de avaliação da região
+      responses:
+        '200':
+          description: Parâmetros vigentes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParametrosAvaliacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Comandos]
+      operationId: definirParametros
+      summary: Define os parâmetros de avaliação da região
+      description: Os parâmetros são por região porque o mesmo acumulado tem significado diferente em cada território.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParametrosAvaliacao' }
+      responses:
+        '200':
+          description: Parâmetros atualizados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParametrosAvaliacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '422': { $ref: '#/components/responses/NaoProcessavel' }
+
+  /sinalizacoes:
+    get:
+      tags: [Sinalizacoes]
+      operationId: listarSinalizacoes
+      summary: Lista sinalizações de atenção
+      description: Lida do modelo de escrita, para que o estado seja visto imediatamente após um reconhecimento.
+      parameters:
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoSinalizacao' } }
+        - { name: regiaoId, in: query, schema: { type: string, format: uuid } }
+        - { name: origem, in: query, schema: { $ref: '#/components/schemas/OrigemSinalizacao' } }
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/Tamanho'
+      responses:
+        '200':
+          description: Página de sinalizações
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaSinalizacoes' }
+
+  /sinalizacoes/{sinalizacaoId}:
+    get:
+      tags: [Sinalizacoes]
+      operationId: obterSinalizacao
+      summary: Obtém uma sinalização
+      parameters:
+        - $ref: '#/components/parameters/SinalizacaoId'
+      responses:
+        '200':
+          description: Sinalização encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sinalizacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /sinalizacoes/{sinalizacaoId}/reconhecimento:
+    post:
+      tags: [Comandos]
+      operationId: reconhecerSinalizacao
+      summary: Técnico reconhece a sinalização
+      description: Permitido para sinalizações ABERTA.
+      parameters:
+        - $ref: '#/components/parameters/SinalizacaoId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                observacao: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Sinalização reconhecida
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sinalizacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+  /sinalizacoes/{sinalizacaoId}/encerramento:
+    post:
+      tags: [Comandos]
+      operationId: encerrarSinalizacao
+      summary: Técnico encerra a sinalização
+      description: Permitido para sinalizações ABERTA ou RECONHECIDA.
+      parameters:
+        - $ref: '#/components/parameters/SinalizacaoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string, minLength: 5, maxLength: 500 }
+      responses:
+        '200':
+          description: Sinalização encerrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sinalizacao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflito' }
+
+components:
+  parameters:
+    RegiaoId:
+      name: regiaoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SinalizacaoId:
+      name: sinalizacaoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Tamanho:
+      name: tamanho
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    NaoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Conflito:
+      description: Transição inválida para o estado atual
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoProcessavel:
+      description: Requisição válida, mas violando regra de negócio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+
+  schemas:
+    Problema:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    NivelAtencao:
+      type: string
+      description: Linguagem de atenção, nunca de previsão de evento
+      enum: [NORMAL, OBSERVACAO, ATENCAO, ALTA_ATENCAO]
+
+    Fator:
+      type: object
+      required: [tipo, descricao, fonte]
+      properties:
+        tipo:
+          type: string
+          enum: [CHUVA_ACIMA_PADRAO, PREVISAO_ACIMA_PADRAO, SOLO_SATURADO, HISTORICO_RECORRENTE, VULNERABILIDADE, NIVEL_ELEVADO, DADO_INDISPONIVEL]
+        descricao: { type: string }
+        fonte: { type: string, example: CEMADEN }
+        referencia: { type: string, description: Data ou período de referência do dado }
+
+    ResumoPanorama:
+      type: object
+      required: [regiaoId, regiaoNome, nivelAtencao, atualizadoEm]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        regiaoNome: { type: string }
+        municipio: { type: string }
+        nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
+        sinalizacoesAbertas: { type: integer }
+        atualizadoEm: { type: string, format: date-time }
+
+    PaginaResumos:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/ResumoPanorama' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
+
+    Panorama:
+      type: object
+      required: [regiaoId, regiaoNome, nivelAtencao, fatores, atualizadoEm, versao]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        regiaoNome: { type: string }
+        municipio: { type: string }
+        nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
+        fatores:
+          type: array
+          items: { $ref: '#/components/schemas/Fator' }
+        chuva:
+          type: object
+          properties:
+            acumulado24hMm: { type: number }
+            acumulado72hMm: { type: number }
+            percentilLocal72h: { type: integer, minimum: 0, maximum: 100 }
+        nivel:
+          type: object
+          nullable: true
+          properties:
+            sensorId: { type: string }
+            valorCm: { type: number }
+            disponivel: { type: boolean }
+            medidoEm: { type: string, format: date-time }
+        ocorrencias:
+          type: object
+          properties:
+            totalValidadas: { type: integer }
+            ultimaEm: { type: string, format: date-time, nullable: true }
+        vulnerabilidade:
+          type: object
+          properties:
+            indice: { type: number }
+            populacao: { type: integer }
+        acoes:
+          type: object
+          properties:
+            emAndamento: { type: integer }
+            ultimaConcluidaEm: { type: string, format: date-time, nullable: true }
+        sinalizacoesAbertas: { type: integer }
+        cenarioPrevisto:
+          allOf:
+            - $ref: '#/components/schemas/CenarioPrevisto'
+          nullable: true
+        atualizadoEm:
+          type: string
+          format: date-time
+          description: Momento da última atualização do modelo de leitura
+        versao: { type: integer, format: int64 }
+
+    CenarioPrevisto:
+      type: object
+      required: [regiaoId, acumuladoPrevistoMm, periodoInicio, periodoFim, boletimEmitidoEm, fonte]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        acumuladoPrevistoMm: { type: number }
+        periodoInicio: { type: string, format: date-time }
+        periodoFim: { type: string, format: date-time }
+        comparacaoLocal:
+          type: string
+          enum: [ABAIXO_PADRAO, DENTRO_PADRAO, ACIMA_PADRAO, MUITO_ACIMA_PADRAO]
+        condicaoAnteriorSolo:
+          type: string
+          enum: [SECO, NORMAL, SATURADO]
+        nivelAtencaoPrevisto: { $ref: '#/components/schemas/NivelAtencao' }
+        granularidade: { type: string, enum: [MUNICIPIO, REGIAO] }
+        boletimEmitidoEm: { type: string, format: date-time }
+        fonte: { type: string, enum: [INMET] }
+
+    ParametrosAvaliacao:
+      type: object
+      required: [percentilAtencao, percentilAltaAtencao]
+      properties:
+        regiaoId: { type: string, format: uuid, readOnly: true }
+        percentilAtencao: { type: integer, minimum: 50, maximum: 99, default: 85 }
+        percentilAltaAtencao: { type: integer, minimum: 51, maximum: 100, default: 95 }
+        pesoVulnerabilidade: { type: number, minimum: 0, maximum: 1, default: 0.3 }
+        janelaHistoricaAnos: { type: integer, minimum: 1, maximum: 35, default: 10 }
+        atualizadoEm: { type: string, format: date-time, readOnly: true }
+
+    EstadoSinalizacao:
+      type: string
+      enum: [ABERTA, RECONHECIDA, ENCERRADA]
+
+    OrigemSinalizacao:
+      type: string
+      enum: [OBSERVADO, PREVISTO]
+
+    Sinalizacao:
+      type: object
+      required: [id, regiaoId, origem, nivelAtencao, motivo, estado, emitidaEm]
+      properties:
+        id: { type: string, format: uuid }
+        regiaoId: { type: string, format: uuid }
+        origem: { $ref: '#/components/schemas/OrigemSinalizacao' }
+        nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
+        motivo: { type: string }
+        fatores:
+          type: array
+          items: { $ref: '#/components/schemas/Fator' }
+        estado: { $ref: '#/components/schemas/EstadoSinalizacao' }
+        emitidaEm: { type: string, format: date-time }
+        reconhecidaPor: { type: string, format: uuid, nullable: true }
+        reconhecidaEm: { type: string, format: date-time, nullable: true }
+        encerradaEm: { type: string, format: date-time, nullable: true }
+        motivoEncerramento: { type: string, nullable: true }
+
+    PaginaSinalizacoes:
+      type: object
+      required: [itens, pagina, tamanho, total]
+      properties:
+        itens: { type: array, items: { $ref: '#/components/schemas/Sinalizacao' } }
+        pagina: { type: integer }
+        tamanho: { type: integer }
+        total: { type: integer }
