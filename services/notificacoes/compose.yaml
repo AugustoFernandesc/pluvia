@@ -1,0 +1,41 @@
+services:
+  notificacoes:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "3000"
+      POSTGRES_HOST: notificacoes-db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      notificacoes-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aplicacao
+      - notificacoes-dados
+
+  notificacoes-db:
+    image: postgres:17-alpine
+    env_file: .env
+    volumes:
+      - notificacoes-db-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - notificacoes-dados
+
+volumes:
+  notificacoes-db-dados:
+
+networks:
+  aplicacao:
+  notificacoes-dados:

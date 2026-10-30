@@ -1,0 +1,12 @@
+node_modules
+dist
+test
+coverage
+.env
+.env.*
+!.env.example
+.git
+Dockerfile
+compose.yaml
+README.md
+*.md
