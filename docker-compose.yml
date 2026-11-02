@@ -5,6 +5,8 @@ include:
   - services/territorio/compose.yaml
   - services/monitoramento/compose.yaml
   - services/notificacoes/compose.yaml
+  - services/risco/compose.yaml
+  - services/analise/compose.yaml
   - infra/rabbitmq/compose.yaml
 
 networks:
