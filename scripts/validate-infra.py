@@ -346,6 +346,42 @@ def validate_ci_workflow() -> None:
     if not isinstance(workflow, dict):
         return
     jobs = workflow.get("jobs", {})
+    static_steps = jobs.get("static-infrastructure", {}).get("steps", [])
+    analise_test_step = next(
+        (
+            step
+            for step in static_steps
+            if step.get("name") == "Testes do servico Analise"
+        ),
+        {},
+    )
+    if not all(
+        marker in analise_test_step.get("run", "")
+        for marker in (
+            "requirements-dev.txt",
+            "python -m compileall",
+            "python -m pytest -q services/analise/tests",
+        )
+    ):
+        fail("A CI deve instalar dependencias e executar os testes do servico Analise.")
+
+    risco_job = jobs.get("service-risco", {})
+    risco_steps = risco_job.get("steps", [])
+    risco_commands = "\n".join(step.get("run", "") for step in risco_steps)
+    if not all(
+        marker in risco_commands
+        for marker in (
+            "npm run test:unit",
+            "npm run test:e2e",
+            "npm run build",
+        )
+    ) or risco_job.get("runs-on") != "ubuntu-latest":
+        fail("A CI deve executar testes unitarios, e2e com Docker e build do servico Risco.")
+
+    for job_name in ("docker-integration", "kubernetes-kind"):
+        if "service-risco" not in jobs.get(job_name, {}).get("needs", []):
+            fail(f"O job {job_name} deve aguardar os testes do servi\u00e7o Risco.")
+
     kubectl_versions = []
     for job in jobs.values():
         for step in job.get("steps", []):
@@ -408,6 +444,8 @@ def validate_ci_workflow() -> None:
         fail("A CI não deve aguardar com --wait o serviço one-shot kong-config.")
     if 'build bff-web bff-mobile keycloak kong' not in compose_run:
         fail("A CI Docker deve construir o serviço Kong usando a imagem com o plugin local.")
+    if not all(name in compose_run for name in ("analise", "risco")):
+        fail("A CI Docker deve construir as imagens dos servicos Analise e Risco integrados.")
     if not any(
         step.get("name") == "Diagnosticar falha Docker, Keycloak ou Kong"
         and step.get("if") == "failure()"
