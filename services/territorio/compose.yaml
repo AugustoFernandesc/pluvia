@@ -1,0 +1,41 @@
+services:
+  territorio:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "3000"
+      POSTGRES_HOST: territorio-db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      territorio-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aplicacao
+      - territorio-dados
+
+  territorio-db:
+    image: postgis/postgis:17-3.5-alpine
+    env_file: .env
+    volumes:
+      - territorio-db-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - territorio-dados
+
+volumes:
+  territorio-db-dados:
+
+networks:
+  aplicacao:
+  territorio-dados:

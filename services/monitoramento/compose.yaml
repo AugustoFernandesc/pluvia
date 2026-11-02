@@ -1,0 +1,41 @@
+services:
+  monitoramento:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "3000"
+      POSTGRES_HOST: monitoramento-db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      monitoramento-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aplicacao
+      - monitoramento-dados
+
+  monitoramento-db:
+    image: timescale/timescaledb:2.19.3-pg17
+    env_file: .env
+    volumes:
+      - monitoramento-db-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - monitoramento-dados
+
+volumes:
+  monitoramento-db-dados:
+
+networks:
+  aplicacao:
+  monitoramento-dados:
