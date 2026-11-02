@@ -253,6 +253,17 @@ def validate_compose_root() -> None:
     if not expected.issubset(included):
         fail("Compose raiz não inclui todos os componentes implementados.")
 
+    keycloak_compose = load_yaml(ROOT / "infra" / "keycloak" / "compose.yaml")
+    healthcheck = (
+        keycloak_compose.get("services", {}).get("keycloak", {}).get("healthcheck", {})
+        if isinstance(keycloak_compose, dict)
+        else {}
+    )
+    healthcheck_command = healthcheck.get("test", [])
+    shell_check = healthcheck_command[-1] if healthcheck_command else ""
+    if "$$status" not in shell_check or " 200 " not in shell_check:
+        fail("Healthcheck Compose do Keycloak deve preservar $status para o shell e exigir HTTP 200.")
+
 
 def validate_ci_workflow() -> None:
     workflow = load_yaml(ROOT / ".github" / "workflows" / "ci.yml")
@@ -272,16 +283,45 @@ def validate_ci_workflow() -> None:
         for step in jobs.get("kubernetes-kind", {}).get("steps", [])
         if step.get("uses", "").startswith("helm/kind-action@")
     ]
-    if not kind_steps:
-        fail("O workflow precisa criar o cluster Kind do job Kubernetes.")
-    else:
-        kind_config = kind_steps[0].get("with", {})
-        if kind_config.get("version") != "v0.27.0" or kind_config.get("kubectl_version") != "v1.32.2":
-            fail("A action Kind deve fixar versões compatíveis de Kind e kubectl.")
-        if not str(kind_config.get("node_image", "")).startswith(
-            "kindest/node:v1.32.2@sha256:"
-        ):
-            fail("A imagem de nó Kind deve estar fixada em Kubernetes 1.32.2 por digest.")
+    if kind_steps:
+        fail("O job Kind não deve usar a instalação legada de kubectl da helm/kind-action.")
+    kind_install_step = next(
+        (
+            step
+            for step in jobs.get("kubernetes-kind", {}).get("steps", [])
+            if step.get("name") == "Instalar Kind v0.27.0 com checksum oficial"
+        ),
+        {},
+    )
+    kind_install = kind_install_step.get("run", "")
+    if not all(
+        marker in kind_install
+        for marker in (
+            "https://github.com/kubernetes-sigs/kind/releases/download/",
+            "kind-linux-amd64.sha256sum",
+            "sha256sum --check",
+        )
+    ) or kind_install_step.get("env", {}).get("KIND_VERSION") != "v0.27.0":
+        fail("O workflow deve instalar Kind v0.27.0 do release oficial e validar o checksum.")
+    kind_create_step = next(
+        (
+            step
+            for step in jobs.get("kubernetes-kind", {}).get("steps", [])
+            if step.get("name") == "Conferir kubectl e criar cluster Kind"
+        ),
+        {},
+    )
+    kind_create = kind_create_step.get("run", "")
+    if not all(
+        marker in kind_create
+        for marker in (
+            "kubectl version --client",
+            "kind create cluster --name pluvia",
+        )
+    ) or not str(kind_create_step.get("env", {}).get("KIND_NODE_IMAGE", "")).startswith(
+        "kindest/node:v1.32.2@sha256:"
+    ):
+        fail("O job Kind deve validar kubectl e criar o nó com versão fixada antes dos deploys.")
 
     docker_job_steps = jobs.get("docker-integration", {}).get("steps", [])
     compose_run = next(
@@ -292,6 +332,13 @@ def validate_ci_workflow() -> None:
         fail("A CI não deve aguardar com --wait o serviço one-shot kong-config.")
     if 'build bff-web bff-mobile keycloak kong' not in compose_run:
         fail("A CI Docker deve construir o serviço Kong usando a imagem com o plugin local.")
+    if not any(
+        step.get("name") == "Diagnosticar falha Docker, Keycloak ou Kong"
+        and step.get("if") == "failure()"
+        and "logs --no-color --timestamps --tail=200" in step.get("run", "")
+        for step in docker_job_steps
+    ):
+        fail("O job Docker deve exibir estado e logs de Keycloak, PostgreSQL e Kong quando falhar.")
 
     kind_run = "\n".join(step.get("run", "") for step in jobs.get("kubernetes-kind", {}).get("steps", []))
     for marker in (
@@ -304,6 +351,22 @@ def validate_ci_workflow() -> None:
     ):
         if marker not in kind_run:
             fail(f"O job Kind não inclui a etapa necessária: {marker}.")
+    if not any(
+        step.get("name") == "Diagnosticar falha Kubernetes, Kind ou Traefik"
+        and step.get("if") == "failure()"
+        and all(
+            marker in step.get("run", "")
+            for marker in (
+                "kubectl get events -A",
+                "kubectl describe ingress -A",
+                "kubectl logs",
+                "--all-containers",
+                "--previous",
+            )
+        )
+        for step in jobs.get("kubernetes-kind", {}).get("steps", [])
+    ):
+        fail("O job Kubernetes deve diagnosticar eventos, Ingress, pods e logs dos containers anteriores.")
 
     integration = (ROOT / "scripts" / "ci_integration.py").read_text(encoding="utf-8")
     if not all(

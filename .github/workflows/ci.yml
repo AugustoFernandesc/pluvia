@@ -103,6 +103,13 @@ jobs:
             echo "Keycloak metadata did not become reachable through Kong." >&2
             exit 1
           fi
+      - name: Diagnosticar falha Docker, Keycloak ou Kong
+        if: failure()
+        run: |
+          compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
+          "${compose[@]}" ps --all
+          "${compose[@]}" logs --no-color --timestamps --tail=200 \
+            keycloak keycloak-db kong-config kong bff-web bff-mobile
       - name: Validar autenticação real e rotas via Kong
         run: >-
           python scripts/ci_integration.py
@@ -130,12 +137,32 @@ jobs:
       - uses: azure/setup-helm@v4
         with:
           version: v3.17.3
-      - uses: helm/kind-action@v1.10.0
-        with:
-          cluster_name: pluvia
-          version: v0.27.0
-          node_image: kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
-          kubectl_version: v1.32.2
+      - name: Instalar Kind v0.27.0 com checksum oficial
+        env:
+          KIND_VERSION: v0.27.0
+        run: |
+          install_dir="$RUNNER_TEMP/pluvia-kind"
+          mkdir -p "$install_dir"
+          cd "$install_dir"
+          curl --fail --location --silent --show-error --retry 3 \
+            --output kind-linux-amd64 \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          curl --fail --location --silent --show-error --retry 3 \
+            --output kind-linux-amd64.sha256sum \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64.sha256sum"
+          grep 'kind-linux-amd64' kind-linux-amd64.sha256sum | sha256sum --check
+          chmod +x kind-linux-amd64
+          mv kind-linux-amd64 kind
+          echo "$install_dir" >> "$GITHUB_PATH"
+          "$install_dir/kind" version
+      - name: Conferir kubectl e criar cluster Kind
+        env:
+          KIND_NODE_IMAGE: kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
+        run: |
+          kubectl version --client
+          kind version
+          kind create cluster --name pluvia --image "$KIND_NODE_IMAGE" --wait 120s
+          kubectl get nodes -o wide
       - name: Criar configuração e credenciais efêmeras
         run: python scripts/prepare-ci-env.py
       - name: Construir imagens da aplicação
@@ -227,6 +254,35 @@ jobs:
             --gateway-url http://127.0.0.1:18080 \
             --host-header pluvia.local \
             --issuer http://pluvia.local/auth/realms/pluvia
+      - name: Diagnosticar falha Kubernetes, Kind ou Traefik
+        if: failure()
+        run: |
+          set +e
+          echo '=== Contexto e nós ==='
+          kubectl cluster-info
+          kubectl get nodes -o wide
+          echo '=== Pods e rollouts ==='
+          kubectl get pods -A -o wide
+          kubectl get deployments,statefulsets -A -o wide
+          echo '=== Events ==='
+          kubectl get events -A --sort-by='.metadata.creationTimestamp'
+          echo '=== Ingress ==='
+          kubectl get ingress,ingressclass -A -o wide
+          kubectl describe ingress -A
+          echo '=== Describe pods e logs de todos os containers/initContainers ==='
+          pods="$(kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name' --no-headers 2>/dev/null)"
+          while read -r namespace pod; do
+            [ -n "$namespace" ] || continue
+            echo "--- describe pod/$pod namespace=$namespace ---"
+            kubectl describe pod "$pod" --namespace "$namespace"
+            echo "--- logs pod/$pod namespace=$namespace ---"
+            kubectl logs "$pod" --namespace "$namespace" --all-containers --prefix --tail=200
+            echo "--- previous logs pod/$pod namespace=$namespace ---"
+            kubectl logs "$pod" --namespace "$namespace" --all-containers --previous --prefix --tail=200
+          done <<< "$pods"
       - name: Excluir cluster temporário
         if: always()
-        run: kind delete cluster --name pluvia
+        run: |
+          if kind get clusters | grep --quiet --line-regexp pluvia; then
+            kind delete cluster --name pluvia
+          fi
