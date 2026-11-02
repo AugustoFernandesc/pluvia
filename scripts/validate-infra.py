@@ -144,6 +144,31 @@ def validate_kong() -> None:
     )
     if compose_image != "pluvia/kong:local":
         fail("Compose deve executar a imagem Kong que contém o plugin local.")
+    expected_proxy_buffers = {
+        "KONG_NGINX_PROXY_PROXY_BUFFER_SIZE": "16k",
+        "KONG_NGINX_PROXY_PROXY_BUFFERS": "8 16k",
+        "KONG_NGINX_PROXY_PROXY_BUSY_BUFFERS_SIZE": "32k",
+    }
+    compose_buffer_config = (
+        compose_kong.get("services", {}).get("kong", {}).get("environment", {})
+        if isinstance(compose_kong, dict)
+        else {}
+    )
+    if any(compose_buffer_config.get(name) != value for name, value in expected_proxy_buffers.items()):
+        fail("Compose deve dimensionar juntos os buffers proxy do Kong para Nginx aceitar a configuração.")
+    deployment = load_yaml(ROOT / "k8s" / "kong" / "deployment.yaml")
+    k8s_container = (
+        deployment.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0]
+        if isinstance(deployment, dict)
+        else {}
+    )
+    k8s_environment = {
+        item.get("name"): item.get("value")
+        for item in k8s_container.get("env", [])
+        if isinstance(item, dict)
+    }
+    if any(k8s_environment.get(name) != value for name, value in expected_proxy_buffers.items()):
+        fail("Kubernetes deve usar o mesmo dimensionamento válido de buffers proxy do Kong.")
 
     global_names = {plugin.get("name") for plugin in document.get("plugins", [])}
     required_global = {"correlation-id", "request-size-limiting"}
@@ -361,6 +386,8 @@ def validate_ci_workflow() -> None:
         and all(
             marker in step.get("run", "")
             for marker in (
+                "kubectl get services -A",
+                "kubectl describe services -A",
                 "kubectl get events -A",
                 "kubectl describe ingress -A",
                 "kubectl logs",
@@ -371,6 +398,16 @@ def validate_ci_workflow() -> None:
         for step in jobs.get("kubernetes-kind", {}).get("steps", [])
     ):
         fail("O job Kubernetes deve diagnosticar eventos, Ingress, pods e logs dos containers anteriores.")
+    traefik_install = next(
+        (
+            step.get("run", "")
+            for step in jobs.get("kubernetes-kind", {}).get("steps", [])
+            if step.get("name") == "Instalar Traefik no cluster temporário"
+        ),
+        "",
+    )
+    if "--set service.spec.type=ClusterIP" not in traefik_install:
+        fail("Traefik em Kind deve usar Service ClusterIP, compatível com o port-forward e sem LoadBalancer externo.")
 
     integration = (ROOT / "scripts" / "ci_integration.py").read_text(encoding="utf-8")
     if not all(

@@ -64,6 +64,12 @@ spec:
               value: 0.0.0.0:8000
             - name: KONG_STATUS_LISTEN
               value: 0.0.0.0:8100
+            - name: KONG_NGINX_PROXY_PROXY_BUFFER_SIZE
+              value: 16k
+            - name: KONG_NGINX_PROXY_PROXY_BUFFERS
+              value: "8 16k"
+            - name: KONG_NGINX_PROXY_PROXY_BUSY_BUFFERS_SIZE
+              value: 32k
           ports:
             - name: proxy
               containerPort: 8000
