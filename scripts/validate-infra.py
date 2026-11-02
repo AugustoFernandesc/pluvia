@@ -264,6 +264,27 @@ def validate_kubernetes() -> None:
     if realm.exists() and copied_realm.exists():
         if realm.read_bytes() != copied_realm.read_bytes():
             fail("A cópia de importação Kubernetes do realm divergiu da configuração canônica.")
+    if realm.exists():
+        realm_config = json.loads(realm.read_text(encoding="utf-8"))
+        client_scopes = {
+            scope.get("name"): scope for scope in realm_config.get("clientScopes", [])
+        }
+        for client in realm_config.get("clients", []):
+            missing_scopes = set(client.get("defaultClientScopes", [])) - set(client_scopes)
+            if missing_scopes:
+                fail(
+                    f"Keycloak client {client.get('clientId')} referencia scopes não declarados: "
+                    f"{', '.join(sorted(missing_scopes))}."
+                )
+        roles_scope = client_scopes.get("roles", {})
+        realm_roles_mapper = any(
+            mapper.get("protocolMapper") == "oidc-usermodel-realm-role-mapper"
+            and mapper.get("config", {}).get("claim.name") == "realm_access.roles"
+            and mapper.get("config", {}).get("access.token.claim") == "true"
+            for mapper in roles_scope.get("protocolMappers", [])
+        )
+        if not realm_roles_mapper:
+            fail("Keycloak precisa declarar o scope roles com mapper de papéis do realm no access token.")
 
 
 def validate_compose_root() -> None:
