@@ -26,7 +26,8 @@ services:
     restart: "no"
 
   kong:
-    image: kong:3.9.3
+    image: pluvia/kong:local
+    build: .
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /etc/kong/rendered/kong.yml

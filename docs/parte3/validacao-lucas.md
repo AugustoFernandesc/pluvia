@@ -54,11 +54,11 @@ Cada BFF recebe `PORT`, `KEYCLOAK_ISSUER`, `KEYCLOAK_JWKS_URL` e a sua `OIDC_AUD
 
    ```sh
    docker compose config --quiet
-   docker compose up -d --build --wait
+   docker compose up -d --build
    docker compose ps
    ```
 
-   O Compose raiz mantém os `include:` dos demais integrantes. Para a validação focada nos BFFs e na identidade, a CI inicia `bff-web`, `bff-mobile`, `keycloak-db`, `kong-config` e `kong`; dependências aguardam healthchecks e a conclusão do bootstrap de configuração.
+   O Compose raiz mantém os `include:` dos demais integrantes. `kong-config` é um serviço one-shot: deve encerrar com código zero após gerar a configuração, e Kong aguarda essa conclusão. Por isso a instrução não usa `--wait` para toda a stack; confira o estado dos serviços duradouros em `docker compose ps`. A CI aguarda os healthchecks de Keycloak/BFFs, inicia Kong após o bootstrap e consulta o endpoint OIDC até responder.
 
 3. A entrada HTTP do Kong é `http://localhost:8000`. Consulte `GET http://localhost:8000/auth/realms/pluvia/.well-known/openid-configuration`; o campo `issuer` deve coincidir exatamente com `KEYCLOAK_ISSUER`.
 4. A administração do Kong não é publicada. O Keycloak também não publica uma porta no Compose padrão. O arquivo `.github/docker-compose-ci.override.yaml` publica Keycloak apenas em `127.0.0.1:18080` para que o teste de CI consiga criar clientes de curta duração.
@@ -76,8 +76,9 @@ Instale o controlador no cluster, fora do namespace da aplicação:
 ```sh
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
-helm upgrade --install traefik traefik/traefik --namespace traefik --create-namespace --version 42.1.3
+helm upgrade --install traefik traefik/traefik --namespace traefik --create-namespace --version 42.1.3 --set ingressClass.enabled=true --set ingressClass.name=traefik --wait --timeout 180s
 kubectl rollout status deployment/traefik --namespace traefik
+kubectl get ingressclass traefik
 ```
 
 O chart cria a classe `traefik`. O manifesto `k8s/ingress/ingress.yaml` usa essa classe e encaminha todo o tráfego HTTP de `pluvia.local` ao Service `kong` na porta 8000. Não há rota direta aos BFFs.
@@ -144,8 +145,8 @@ Use imagens em um registry acessível pelo cluster; para Kind, carregue as image
 ```sh
 docker build -t pluvia/bff-web:local services/bff-web
 docker build -t pluvia/bff-mobile:local services/bff-mobile
-docker pull kong:3.9.3
-kind load docker-image --name pluvia pluvia/bff-web:local pluvia/bff-mobile:local pluvia/keycloak:local kong:3.9.3
+docker build -t pluvia/kong:local infra/kong
+kind load docker-image --name pluvia pluvia/bff-web:local pluvia/bff-mobile:local pluvia/keycloak:local pluvia/kong:local
 kubectl apply -k k8s/bff-web
 kubectl apply -k k8s/bff-mobile
 kubectl apply -k k8s/kong
@@ -171,7 +172,9 @@ Uma resposta pública do BFF prova o fluxo HTTP Ingress → Kong → BFF naquele
 
 ## Limites de rate limiting
 
-As rotas autenticadas aplicam 300 req/min no Web e 120 req/min no Mobile por consumidor Kong. Como o consumidor JWT é identificado pelo claim `iss`, todos os usuários do mesmo realm Keycloak compartilham `pluvia-keycloak` e o respectivo contador. As rotas públicas Mobile (30 req/min) e `/auth` (20 req/min) limitam por IP. A política configurada é local, conforme o template; múltiplas réplicas Kong mantêm contadores separados.
+As rotas autenticadas aplicam 300 req/min no Web e 120 req/min no Mobile por usuário. O plugin JWT ainda mapeia o issuer para o Consumer `pluvia-keycloak`, mas o plugin local `pluvia-subject-rate-limit` lê o `sub` somente do JWT já validado, deriva um SHA-256 e sobrescreve o header interno `X-Pluvia-RateLimit-Subject`. O plugin nativo `rate-limiting` usa esse valor como chave. Qualquer valor recebido do cliente é substituído depois da autenticação e o plugin `request-transformer` remove o header antes de encaminhar ao BFF.
+
+A CI verifica contadores separados com dois tokens Web e dois tokens Mobile, incluindo requisições com valores forjados e diferentes para o header. Também confirma que o header não chega aos BFFs. Os limites públicos Mobile (30 req/min) e `/auth` (20 req/min) continuam por IP. A política de contagem é local, e a implantação contém uma réplica Kong; ao escalar horizontalmente será necessário uma política de armazenamento compartilhado, como Redis, para manter cotas globais por usuário.
 
 ## Testes e CI
 
@@ -181,14 +184,14 @@ Localmente, os testes dos BFFs usam uma chave RSA e um servidor JWKS HTTP efême
 
 - **BFF matrix:** Node 24, `npm ci`, lint, typecheck, testes HTTP e build dos dois BFFs.
 - **Validação estática:** Python, PyYAML, testes do bootstrap, configuração efêmera para geradores Kustomize e `kubectl kustomize k8s`.
-- **Docker e autenticação real:** gera credenciais descartáveis no runner, valida Compose, sobe Keycloak/Postgres/Kong/BFFs, obtém JWTs do Keycloak e verifica issuer, papéis, 401/403, rota pública e encaminhamento pelo Kong.
-- **Kind e Traefik:** constrói/carrega imagens, instala o chart Traefik, aplica Keycloak/Kong/BFFs e executa o mesmo teste de autenticação através do Ingress. O cluster é removido ao final.
+- **Docker e autenticação real:** gera credenciais descartáveis no runner, valida Compose, constrói o Kong com o plugin local, sobe Keycloak/Postgres/Kong/BFFs, obtém JWTs do Keycloak e verifica issuer, papéis, 401/403, rota pública, contadores por subject, resistência a headers forjados e encaminhamento pelo Kong.
+- **Kind e Traefik:** constrói/carrega as imagens, instala e aguarda o chart Traefik, confirma a IngressClass, aplica Keycloak/Kong/BFFs e executa o mesmo teste de autenticação e rate limit através do Ingress. O cluster é removido ao final.
 
 Os gatilhos são push em `BranchLucas`/`BRANCHLUCAS`, Pull Request para `develop` e execução manual. Os jobs não usam secrets permanentes do GitHub. Clientes de teste e credenciais são temporários; o job Docker remove volumes e o job Kind exclui o cluster. A criação deste workflow não significa que ele já foi executado: os resultados só existirão após o push ou execução manual no GitHub, com Actions habilitado.
 
 ## Limitações e diagnóstico
 
-- **NÃO EXECUTADO localmente:** validação com Docker daemon, startup real do Compose, Keycloak/Kong integrados, criação de Pods, probes e tráfego real pelo Ingress. A máquina desta entrega não tem Docker, kubectl ou Helm; o workflow hospedado é o mecanismo de execução posterior.
+- **NÃO EXECUTADO localmente:** validação com Docker daemon, startup real do Compose, carregamento do plugin Lua no Kong, Keycloak/Kong integrados, criação de Pods, probes e tráfego real pelo Ingress. A máquina desta entrega não tem Docker, kubectl ou Helm; o workflow hospedado é o mecanismo de execução posterior e ainda precisa rodar no GitHub Actions.
 - **401:** confira issuer, audience, assinatura, expiração e se o bearer foi enviado. A rota `/auth` precisa anunciar o issuer externo com esse prefixo.
 - **403:** a assinatura foi aceita, mas o token não contém o papel autorizado em `realm_access.roles`.
 - **503 no BFF:** verifique se o endereço interno de JWKS (`keycloak:8080` no Compose/Kubernetes) está acessível e se Keycloak já publicou uma chave RS256.

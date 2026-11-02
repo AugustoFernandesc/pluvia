@@ -63,6 +63,7 @@ describe('BFF Mobile: public routes, JWT, roles and path prefix', () => {
     expect(response.status).toBe(200);
     expect(response.body.roles).toEqual(['AGENTE']);
     expect(response.body.component).toBe('bff-mobile');
+    expect(response.body.gatewayRateLimitSubjectHeaderPresent).toBe(false);
   });
 
   it('returns 403 for an authenticated user without AGENTE', async () => {

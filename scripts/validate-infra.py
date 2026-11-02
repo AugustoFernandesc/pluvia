@@ -90,15 +90,60 @@ def validate_kong() -> None:
     jwt_config = _plugin({"plugins": services["bff-web"].get("plugins", [])}, "jwt", "web")
     if jwt_config.get("key_claim_name") != "iss" or jwt_config.get("claims_to_verify") != ["exp"]:
         fail("Kong JWT deve localizar o consumidor pelo issuer e verificar exp.")
+    subject_header = "X-Pluvia-RateLimit-Subject"
     for name, route, limit, limit_by in (
-        ("web", {"plugins": services["bff-web"].get("plugins", [])}, 300, "consumer"),
-        ("mobile", mobile, 120, "consumer"),
+        ("web", {"plugins": services["bff-web"].get("plugins", [])}, 300, "header"),
+        ("mobile", mobile, 120, "header"),
         ("mobile-publico", public, 30, "ip"),
         ("auth", {"plugins": services["keycloak"].get("plugins", [])}, 20, "ip"),
     ):
         plugin = _plugin({"plugins": route.get("plugins", [])}, "rate-limiting", name)
         if plugin.get("minute") != limit or plugin.get("limit_by") != limit_by:
             fail(f"Rate limit da rota {name} diverge da arquitetura.")
+        if limit_by == "header" and plugin.get("header_name") != subject_header:
+            fail(f"Rate limit autenticado de {name} não usa o header interno configurado.")
+
+    web_plugins = services["bff-web"].get("plugins", [])
+    mobile_service_plugins = services["bff-mobile"].get("plugins", [])
+    if not any(plugin.get("name") == "pluvia-subject-rate-limit" for plugin in web_plugins):
+        fail("O Web precisa derivar a chave do rate limit do JWT autenticado.")
+    if not any(plugin.get("name") == "pluvia-subject-rate-limit" for plugin in mobile.get("plugins", [])):
+        fail("A rota Mobile protegida precisa derivar a chave do rate limit do JWT autenticado.")
+    for name, plugins in (("Web", web_plugins), ("Mobile", mobile_service_plugins)):
+        transformer = _plugin({"plugins": plugins}, "request-transformer", name)
+        removed_headers = transformer.get("remove", {}).get("headers", [])
+        if subject_header not in removed_headers:
+            fail(f"O {name} precisa remover o header interno antes do upstream.")
+
+    plugin_dir = ROOT / "infra" / "kong" / "plugins" / "pluvia-subject-rate-limit"
+    handler_path = plugin_dir / "handler.lua"
+    schema_path = plugin_dir / "schema.lua"
+    if not handler_path.is_file() or not schema_path.is_file():
+        fail("O plugin Lua local do Kong precisa conter handler.lua e schema.lua.")
+    elif handler_path.is_file():
+        source = handler_path.read_text(encoding="utf-8")
+        if not all(
+            marker in source
+            for marker in (
+                "PRIORITY = 1000",
+                "authenticated_jwt_token",
+                "claims.sub",
+                "sha256.sha256_hex",
+                "ngx.req.set_header",
+            )
+        ):
+            fail("O plugin deve usar o JWT validado e sobrescrever o header em prioridade compatível.")
+    dockerfile = (ROOT / "infra" / "kong" / "Dockerfile").read_text(encoding="utf-8")
+    if "FROM kong:3.9.3" not in dockerfile or "KONG_PLUGINS=bundled,pluvia-subject-rate-limit" not in dockerfile:
+        fail("A imagem Kong deve fixar 3.9.3 e carregar o plugin local.")
+    compose_kong = load_yaml(ROOT / "infra" / "kong" / "compose.yaml")
+    compose_image = (
+        compose_kong.get("services", {}).get("kong", {}).get("image")
+        if isinstance(compose_kong, dict)
+        else None
+    )
+    if compose_image != "pluvia/kong:local":
+        fail("Compose deve executar a imagem Kong que contém o plugin local.")
 
     global_names = {plugin.get("name") for plugin in document.get("plugins", [])}
     required_global = {"correlation-id", "request-size-limiting"}
@@ -159,6 +204,12 @@ def validate_kubernetes() -> None:
     if not expected.issubset(resources):
         fail("A Kustomization raiz não inclui BFFs, Keycloak, Kong e Ingress.")
 
+    kong_deployment = load_yaml(ROOT / "k8s" / "kong" / "deployment.yaml")
+    if kong_deployment:
+        kong_image = kong_deployment["spec"]["template"]["spec"]["containers"][0].get("image")
+        if kong_image != "pluvia/kong:local":
+            fail("Kubernetes deve executar a imagem Kong que contém o plugin local.")
+
     for component in ("bff-web", "bff-mobile"):
         folder = ROOT / "k8s" / component
         kustomization = load_yaml(folder / "kustomization.yaml")
@@ -203,17 +254,84 @@ def validate_compose_root() -> None:
         fail("Compose raiz não inclui todos os componentes implementados.")
 
 
+def validate_ci_workflow() -> None:
+    workflow = load_yaml(ROOT / ".github" / "workflows" / "ci.yml")
+    if not isinstance(workflow, dict):
+        return
+    jobs = workflow.get("jobs", {})
+    kubectl_versions = []
+    for job in jobs.values():
+        for step in job.get("steps", []):
+            if step.get("uses", "").startswith("azure/setup-kubectl@"):
+                kubectl_versions.append(step.get("with", {}).get("version"))
+    if kubectl_versions != ["v1.32.2", "v1.32.2"]:
+        fail("Os jobs de CI devem instalar kubectl 1.32.2 compatível com o Kind configurado.")
+
+    kind_steps = [
+        step
+        for step in jobs.get("kubernetes-kind", {}).get("steps", [])
+        if step.get("uses", "").startswith("helm/kind-action@")
+    ]
+    if not kind_steps:
+        fail("O workflow precisa criar o cluster Kind do job Kubernetes.")
+    else:
+        kind_config = kind_steps[0].get("with", {})
+        if kind_config.get("version") != "v0.27.0" or kind_config.get("kubectl_version") != "v1.32.2":
+            fail("A action Kind deve fixar versões compatíveis de Kind e kubectl.")
+        if not str(kind_config.get("node_image", "")).startswith(
+            "kindest/node:v1.32.2@sha256:"
+        ):
+            fail("A imagem de nó Kind deve estar fixada em Kubernetes 1.32.2 por digest.")
+
+    docker_job_steps = jobs.get("docker-integration", {}).get("steps", [])
+    compose_run = next(
+        (step.get("run", "") for step in docker_job_steps if step.get("name") == "Construir e iniciar apenas a infraestrutura deste escopo"),
+        "",
+    )
+    if "kong-config" in compose_run.split("up -d --wait", 1)[-1].splitlines()[0]:
+        fail("A CI não deve aguardar com --wait o serviço one-shot kong-config.")
+    if 'build bff-web bff-mobile keycloak kong' not in compose_run:
+        fail("A CI Docker deve construir o serviço Kong usando a imagem com o plugin local.")
+
+    kind_run = "\n".join(step.get("run", "") for step in jobs.get("kubernetes-kind", {}).get("steps", []))
+    for marker in (
+        "export KEYCLOAK_ISSUER=",
+        "export KEYCLOAK_JWKS_URL=",
+        "export KEYCLOAK_DISCOVERY_URL=",
+        "bootstrap-kong.py",
+        "kubectl get ingressclass traefik",
+        "pluvia/kong:local",
+    ):
+        if marker not in kind_run:
+            fail(f"O job Kind não inclui a etapa necessária: {marker}.")
+
+    integration = (ROOT / "scripts" / "ci_integration.py").read_text(encoding="utf-8")
+    if not all(
+        marker in integration
+        for marker in (
+            "AGENTE_2",
+            "client-controlled-a",
+            "X-Pluvia-RateLimit-Subject",
+            "gatewayRateLimitSubjectHeaderPresent",
+            "assert_quota(response_headers, 300",
+            "assert_quota(response_headers, 120",
+        )
+    ):
+        fail("O teste integrado precisa cobrir quotas por subject, spoofing e remoção do header.")
+
+
 def main() -> int:
     validate_syntax()
     validate_kong()
     validate_bffs()
     validate_kubernetes()
     validate_compose_root()
+    validate_ci_workflow()
     if ERRORS:
         for error in ERRORS:
             print(f"ERRO: {error}", file=sys.stderr)
         return 1
-    print("Validações estáticas de YAML, JSON, Kong, Compose e Kubernetes aprovadas.")
+    print("Validações estáticas de YAML, JSON, Kong, Compose, Kubernetes e CI aprovadas.")
     return 0
 
 

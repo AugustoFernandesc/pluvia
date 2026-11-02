@@ -65,7 +65,7 @@ jobs:
         run: python scripts/validate-infra.py
       - uses: azure/setup-kubectl@v4
         with:
-          version: v1.34.0
+          version: v1.32.2
       - name: Renderizar a Kustomization raiz
         run: kubectl kustomize k8s > /dev/null
 
@@ -84,10 +84,25 @@ jobs:
       - name: Validar o Compose completo
         run: docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml config --quiet
       - name: Construir e iniciar apenas a infraestrutura deste escopo
-        run: >-
-          docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml
-          up -d --build --wait
-          bff-web bff-mobile keycloak-db keycloak kong-config kong
+        run: |
+          compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
+          "${compose[@]}" build bff-web bff-mobile keycloak kong
+          "${compose[@]}" up -d --wait bff-web bff-mobile keycloak-db keycloak
+          # kong-config is a one-shot service. Let Kong's service_completed_successfully
+          # dependency run it, and poll the public endpoint instead of --wait on it.
+          "${compose[@]}" up -d kong
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:8000/auth/realms/pluvia/.well-known/openid-configuration > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Keycloak metadata did not become reachable through Kong." >&2
+            exit 1
+          fi
       - name: Validar autenticação real e rotas via Kong
         run: >-
           python scripts/ci_integration.py
@@ -111,7 +126,7 @@ jobs:
           python-version: "3.13"
       - uses: azure/setup-kubectl@v4
         with:
-          version: v1.34.0
+          version: v1.32.2
       - uses: azure/setup-helm@v4
         with:
           version: v3.17.3
@@ -119,6 +134,8 @@ jobs:
         with:
           cluster_name: pluvia
           version: v0.27.0
+          node_image: kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
+          kubectl_version: v1.32.2
       - name: Criar configuração e credenciais efêmeras
         run: python scripts/prepare-ci-env.py
       - name: Construir imagens da aplicação
@@ -126,14 +143,15 @@ jobs:
           docker build -t pluvia/bff-web:local services/bff-web
           docker build -t pluvia/bff-mobile:local services/bff-mobile
           docker build -t pluvia/keycloak:local infra/keycloak
-          docker pull kong:3.9.3
-          kind load docker-image --name pluvia pluvia/bff-web:local pluvia/bff-mobile:local pluvia/keycloak:local kong:3.9.3
+          docker build -t pluvia/kong:local infra/kong
+          kind load docker-image --name pluvia pluvia/bff-web:local pluvia/bff-mobile:local pluvia/keycloak:local pluvia/kong:local
       - name: Instalar Traefik no cluster temporário
         run: |
           helm repo add traefik https://traefik.github.io/charts
           helm repo update
-          helm upgrade --install traefik traefik/traefik --namespace traefik --create-namespace --version 42.1.3
+          helm upgrade --install traefik traefik/traefik --namespace traefik --create-namespace --version 42.1.3 --set ingressClass.enabled=true --set ingressClass.name=traefik --wait --timeout 180s
           kubectl rollout status deployment/traefik --namespace traefik --timeout=180s
+          kubectl get ingressclass traefik
       - name: Criar namespace e segredo temporário do Keycloak
         run: |
           kubectl create namespace pluvia
@@ -153,15 +171,21 @@ jobs:
           kubectl port-forward --namespace pluvia svc/keycloak 18081:8080 > "$RUNNER_TEMP/keycloak-port-forward.log" 2>&1 &
           port_forward_pid=$!
           trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          ready=0
           for attempt in $(seq 1 30); do
             if curl --silent --fail http://127.0.0.1:18081/realms/pluvia/.well-known/openid-configuration > /dev/null; then
+              ready=1
               break
             fi
             sleep 2
           done
-          KEYCLOAK_ISSUER=http://pluvia.local/auth/realms/pluvia \
-          KEYCLOAK_JWKS_URL=http://127.0.0.1:18081/realms/pluvia/protocol/openid-connect/certs \
-          KEYCLOAK_DISCOVERY_URL=http://127.0.0.1:18081/realms/pluvia/.well-known/openid-configuration \
+          if [ "$ready" -ne 1 ]; then
+            echo "Keycloak discovery did not become reachable through port-forward." >&2
+            exit 1
+          fi
+          export KEYCLOAK_ISSUER=http://pluvia.local/auth/realms/pluvia
+          export KEYCLOAK_JWKS_URL=http://127.0.0.1:18081/realms/pluvia/protocol/openid-connect/certs
+          export KEYCLOAK_DISCOVERY_URL=http://127.0.0.1:18081/realms/pluvia/.well-known/openid-configuration
           python infra/kong/bootstrap-kong.py \
             --template gateway/kong.yml.template \
             --renderer gateway/render-kong.py \
@@ -185,12 +209,18 @@ jobs:
           kubectl port-forward --namespace pluvia svc/keycloak 18081:8080 > "$RUNNER_TEMP/keycloak-port-forward.log" 2>&1 &
           keycloak_pid=$!
           trap 'kill "$ingress_pid" "$keycloak_pid" 2>/dev/null || true' EXIT
+          ready=0
           for attempt in $(seq 1 30); do
             if curl --silent --fail -H 'Host: pluvia.local' http://127.0.0.1:18080/mobile/v1/publico/_system/status > /dev/null; then
+              ready=1
               break
             fi
             sleep 2
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "Traefik ingress did not become reachable through port-forward." >&2
+            exit 1
+          fi
           python scripts/ci_integration.py \
             --secret-env-file k8s/keycloak/secret.env \
             --keycloak-url http://127.0.0.1:18081 \

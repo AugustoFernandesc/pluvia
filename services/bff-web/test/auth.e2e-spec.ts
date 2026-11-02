@@ -51,6 +51,7 @@ describe('BFF Web: health, JWT, roles and path prefix', () => {
     expect(response.status).toBe(200);
     expect(response.body.roles).toEqual([role]);
     expect(response.body.component).toBe('bff-web');
+    expect(response.body.gatewayRateLimitSubjectHeaderPresent).toBe(false);
   });
 
   it('enforces a route-specific TECNICO permission', async () => {

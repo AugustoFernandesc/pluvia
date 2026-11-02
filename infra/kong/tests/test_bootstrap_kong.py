@@ -102,6 +102,8 @@ class BootstrapKongTests(unittest.TestCase):
                 self.assertNotIn("__KEYCLOAK_", rendered)
                 self.assertIn(json.dumps(issuer), rendered)
                 self.assertIn("strip_path: false", rendered)
+                self.assertIn("pluvia-subject-rate-limit", rendered)
+                self.assertIn("header_name: X-Pluvia-RateLimit-Subject", rendered)
         finally:
             server.shutdown()
             server.server_close()
@@ -151,13 +153,14 @@ class BootstrapKongTests(unittest.TestCase):
                         "--key-output",
                         str(Path(directory) / "key.pem"),
                         "--timeout-seconds",
-                        "1",
+                        "60",
                         "--poll-seconds",
                         "0.1",
                     ],
                     capture_output=True,
                     text=True,
                     check=False,
+                    timeout=5,
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("issuer", result.stderr.lower())

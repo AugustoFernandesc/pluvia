@@ -118,10 +118,16 @@ def run(args) -> None:
         raise AssertionError("Os scopes de roles e audience não estão configurados.")
     scope_ids = [scopes_by_name[name] for name in required_scopes]
 
+    identities = (
+        ("GESTOR", "GESTOR"),
+        ("TECNICO", "TECNICO"),
+        ("AGENTE_1", "AGENTE"),
+        ("AGENTE_2", "AGENTE"),
+    )
     tokens: dict[str, str] = {}
     subjects: set[str] = set()
-    for role in ("GESTOR", "TECNICO", "AGENTE"):
-        client_id = f"ci-pluvia-{role.lower()}"
+    for identity, role in identities:
+        client_id = f"ci-pluvia-{identity.lower()}"
         status, _, response_headers = http_json(
             f"{direct_root}/admin/realms/{realm}/clients",
             method="POST",
@@ -196,15 +202,37 @@ def run(args) -> None:
         if claims.get("sub") in subjects:
             raise AssertionError("As contas de serviço de teste precisam ter subjects distintos.")
         subjects.add(claims["sub"])
-        tokens[role] = token
+        tokens[identity] = token
 
-    def gateway_request(path: str, token: str | None = None):
+    def gateway_request(
+        path: str,
+        token: str | None = None,
+        forged_rate_subject: str | None = None,
+    ):
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        if forged_rate_subject is not None:
+            headers["X-Pluvia-RateLimit-Subject"] = forged_rate_subject
         if args.host_header:
             headers["Host"] = args.host_header
         return http_json(f"{gateway_root}{path}", headers=headers)
+
+    def assert_quota(response_headers, limit: int, remaining: int, label: str) -> None:
+        actual_limit = response_headers.get("X-RateLimit-Limit-Minute")
+        actual_remaining = response_headers.get("X-RateLimit-Remaining-Minute")
+        if actual_limit is None or int(actual_limit) != limit:
+            raise AssertionError(
+                f"{label}: X-RateLimit-Limit-Minute esperado {limit}, recebido {actual_limit}."
+            )
+        if actual_remaining is None or int(actual_remaining) != remaining:
+            raise AssertionError(
+                f"{label}: X-RateLimit-Remaining-Minute esperado {remaining}, recebido {actual_remaining}."
+            )
+
+    def assert_internal_header_removed(response: dict, label: str) -> None:
+        if response.get("gatewayRateLimitSubjectHeaderPresent") is not False:
+            raise AssertionError(f"{label}: o header interno de rate limit chegou ao BFF.")
 
     assert_status(gateway_request("/web/v1/_system/authorization-check")[0], 401, "Web sem JWT")
     assert_status(
@@ -214,20 +242,37 @@ def run(args) -> None:
     )
 
     status, web_gestor, response_headers = gateway_request(
-        "/web/v1/_system/authorization-check", tokens["GESTOR"]
+        "/web/v1/_system/authorization-check",
+        tokens["GESTOR"],
+        forged_rate_subject="client-controlled-a",
     )
     assert_status(status, 200, "Web com GESTOR")
     if web_gestor.get("roles") != ["GESTOR"]:
         raise AssertionError("O BFF Web não recebeu os papéis verificados do JWT.")
+    assert_quota(response_headers, 300, 299, "primeira Web do GESTOR")
+    assert_internal_header_removed(web_gestor, "BFF Web")
     if not response_headers.get("X-Request-ID"):
         raise AssertionError("O gateway não devolveu X-Request-ID.")
 
-    status, web_tecnico, _ = gateway_request(
-        "/web/v1/_system/tecnico", tokens["TECNICO"]
+    time.sleep(0.05)
+    status, web_gestor_second, response_headers = gateway_request(
+        "/web/v1/_system/authorization-check",
+        tokens["GESTOR"],
+        forged_rate_subject="client-controlled-b",
+    )
+    assert_status(status, 200, "segunda Web do GESTOR")
+    assert_quota(response_headers, 300, 298, "segunda Web do GESTOR")
+    assert_internal_header_removed(web_gestor_second, "BFF Web")
+
+    status, web_tecnico, response_headers = gateway_request(
+        "/web/v1/_system/tecnico",
+        tokens["TECNICO"],
+        forged_rate_subject="client-controlled-a",
     )
     assert_status(status, 200, "Web com TECNICO")
+    assert_quota(response_headers, 300, 299, "primeira Web do TECNICO")
     assert_status(
-        gateway_request("/web/v1/_system/authorization-check", tokens["AGENTE"])[0],
+        gateway_request("/web/v1/_system/authorization-check", tokens["AGENTE_1"])[0],
         403,
         "Web com AGENTE",
     )
@@ -255,16 +300,38 @@ def run(args) -> None:
         403,
         "Mobile com GESTOR",
     )
-    status, mobile_agent, _ = gateway_request(
-        "/mobile/v1/_system/authorization-check", tokens["AGENTE"]
+    status, mobile_agent, response_headers = gateway_request(
+        "/mobile/v1/_system/authorization-check",
+        tokens["AGENTE_1"],
+        forged_rate_subject="client-controlled-a",
     )
     assert_status(status, 200, "Mobile com AGENTE")
     if mobile_agent.get("roles") != ["AGENTE"]:
         raise AssertionError("O BFF Mobile não recebeu o papel AGENTE do JWT.")
 
+    assert_quota(response_headers, 120, 119, "primeira Mobile do AGENTE_1")
+    assert_internal_header_removed(mobile_agent, "BFF Mobile")
+    time.sleep(0.05)
+    status, _, response_headers = gateway_request(
+        "/mobile/v1/_system/authorization-check",
+        tokens["AGENTE_1"],
+        forged_rate_subject="client-controlled-b",
+    )
+    assert_status(status, 200, "segunda requisiÃ§Ã£o Mobile com AGENTE_1")
+    assert_quota(response_headers, 120, 118, "segunda Mobile do AGENTE_1")
+    status, mobile_agent_2, response_headers = gateway_request(
+        "/mobile/v1/_system/authorization-check",
+        tokens["AGENTE_2"],
+        forged_rate_subject="client-controlled-a",
+    )
+    assert_status(status, 200, "Mobile com segundo AGENTE")
+    assert_quota(response_headers, 120, 119, "primeira Mobile do AGENTE_2")
+    assert_internal_header_removed(mobile_agent_2, "BFF Mobile")
+
     consumers = {
         web_gestor.get("gatewayConsumerDiagnostic"),
         mobile_agent.get("gatewayConsumerDiagnostic"),
+        mobile_agent_2.get("gatewayConsumerDiagnostic"),
     }
     if consumers != {"pluvia-keycloak"}:
         raise AssertionError(
@@ -275,8 +342,9 @@ def run(args) -> None:
         "as regras Web/Mobile, o prefixo /auth e os papéis responderam como esperado."
     )
     print(
-        "Rate limit por consumer: os dois subjects foram associados ao consumidor "
-        "Kong pluvia-keycloak (compartilhado pelo issuer do realm)."
+        "Rate limits por subject (Web 300/min, Mobile 120/min) comprovados com o "
+        "Consumer JWT pluvia-keycloak compartilhado; headers forjados foram ignorados "
+        "e o header interno foi removido antes dos BFFs."
     )
 
 

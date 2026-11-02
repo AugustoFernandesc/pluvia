@@ -15,6 +15,10 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 
+class IssuerMismatchError(ValueError):
+    """The configured token issuer differs from Keycloak's published issuer."""
+
+
 def _length(value: int) -> bytes:
     if value < 0x80:
         return bytes([value])
@@ -144,7 +148,7 @@ def main() -> int:
                 args.discovery_url, timeout=min(5.0, args.poll_seconds + 3)
             )
             if discovered_issuer != args.issuer:
-                raise ValueError(
+                raise IssuerMismatchError(
                     "KEYCLOAK_ISSUER diverge do issuer anunciado pela descoberta OpenID Connect."
                 )
             keys = _fetch_jwks(args.jwks_url, timeout=min(5.0, args.poll_seconds + 3))
@@ -171,6 +175,9 @@ def main() -> int:
                     jwk = matching
                 break
             last_error = ValueError("O JWKS ainda não contém uma chave RSA RS256.")
+        except IssuerMismatchError as error:
+            print(str(error), file=sys.stderr)
+            return 1
         except (
             HTTPError,
             URLError,

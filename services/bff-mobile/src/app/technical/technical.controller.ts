@@ -14,6 +14,9 @@ export class TechnicalController {
       authenticated: true,
       roles: request.user?.roles ?? [],
       gatewayConsumerDiagnostic: request.header('x-consumer-username') ?? null,
+      gatewayRateLimitSubjectHeaderPresent: Boolean(
+        request.header('x-pluvia-ratelimit-subject'),
+      ),
     };
   }
 }

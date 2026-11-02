@@ -51,7 +51,7 @@ spec:
               memory: 128Mi
       containers:
         - name: kong
-          image: kong:3.9.3
+          image: pluvia/kong:local
           imagePullPolicy: IfNotPresent
           env:
             - name: KONG_DATABASE
