@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notificacoes-config
+  labels:
+    app.kubernetes.io/name: notificacoes
+data:
+  PORT: "3000"
+  POSTGRES_HOST: notificacoes-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: notificacoes
+  POSTGRES_USER: notificacoes
+  PGDATA: /var/lib/postgresql/data/pgdata
