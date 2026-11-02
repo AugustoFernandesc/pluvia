@@ -13,3 +13,8 @@ resources:
   - territorio
   - monitoramento
   - notificacoes
+  - bff-web
+  - bff-mobile
+  - keycloak
+  - kong
+  - ingress

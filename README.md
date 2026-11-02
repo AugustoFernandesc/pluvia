@@ -536,6 +536,12 @@ Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-
 
 ---
 
+## Parte 3: execução e validação
+
+O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e as limitações do que ainda não foi executado em runtime.
+
+Os BFFs não possuem banco de dados. Nesta etapa, as rotas sob `/_system` são verificações técnicas; os contratos de negócio permanecem descritos em `docs/api/` e não são apresentados como implementados.
+
 ## 🤝 Como colaboramos neste repositório
 
 Convenções adotadas pela equipe desde a Parte 1:
@@ -573,17 +579,19 @@ pluvia/
     │   ├── 07-cqrs.md
     │   ├── 08-eventos.md
     │   └── 09-decisoes.md
-    └── api/                   # Contratos OpenAPI
-        ├── territorio.yaml
-        ├── monitoramento.yaml
-        ├── risco.yaml
-        ├── operacoes.yaml
-        ├── equipes.yaml
-        ├── frota.yaml
-        ├── notificacoes.yaml
-        ├── analise.yaml
-        ├── bff-web.yaml
-        └── bff-mobile.yaml
+    ├── api/                   # Contratos OpenAPI
+    │   ├── territorio.yaml
+    │   ├── monitoramento.yaml
+    │   ├── risco.yaml
+    │   ├── operacoes.yaml
+    │   ├── equipes.yaml
+    │   ├── frota.yaml
+    │   ├── notificacoes.yaml
+    │   ├── analise.yaml
+    │   ├── bff-web.yaml
+    │   └── bff-mobile.yaml
+    └── parte3/                # Guia de execução e validação da Parte 3
+        └── validacao-lucas.md
 ```
 
 ---

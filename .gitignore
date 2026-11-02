@@ -1,6 +1,11 @@
 .env
+.env.*
 !.env.example
 node_modules/
 dist/
+__pycache__/
+*.py[cod]
 openspec/
 secret.env
+**/realm-public-key.pem
+**/kong.yml

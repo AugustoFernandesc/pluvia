@@ -22,10 +22,14 @@ Kong foi escolhido porque oferece, por configuração e sem código, os três re
 
 | Caminho externo | Destino | Autenticação | Limite |
 |---|---|---|---|
-| `/web/v1/*` | BFF Web | JWT obrigatório | 300 req/min por usuário |
+| `/web/v1/*` | BFF Web | JWT obrigatório | 300 req/min por consumidor Kong |
 | `/mobile/v1/publico/*` | BFF Mobile | Nenhuma | 30 req/min por IP |
-| `/mobile/v1/*` | BFF Mobile | JWT obrigatório | 120 req/min por usuário |
+| `/mobile/v1/*` | BFF Mobile | JWT obrigatório | 120 req/min por consumidor Kong |
 | `/auth/*` | Keycloak | Nenhuma | 20 req/min por IP |
+
+### Escopo efetivo do limite autenticado
+
+O plugin JWT usa `key_claim_name: iss` para associar os tokens ao consumidor `pluvia-keycloak`. Como todos os tokens deste realm compartilham o mesmo issuer, usuários distintos do realm também compartilham esse consumidor e o mesmo contador de rate limit. Portanto, os limites protegidos são por realm/consumidor, não por usuário individual. A CI automatiza a verificação com tokens Keycloak de subjects diferentes. Separar a cota por usuário exigiria outra identidade de consumidor confiável no Kong e mudança explícita na arquitetura de credenciais; o gateway não confia em headers de identidade enviados pelo cliente.
 
 Os caminhos chegam aos BFFs **sem alteração**: `/web/v1/painel` chega ao BFF Web como `/web/v1/painel`. Cada BFF é dono do seu espaço de caminhos, o que evita reescrita no gateway e mantém o mesmo endereço nos logs do gateway e do BFF.
 

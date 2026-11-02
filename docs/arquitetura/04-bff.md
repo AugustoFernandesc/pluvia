@@ -2,6 +2,8 @@
 
 A Pluvia tem dois clientes com usuários, contextos e restrições muito diferentes. Um único backend genérico obrigaria um dos dois a receber dados que não usa, ou a fazer várias chamadas para montar uma tela. Por isso, cada cliente tem o seu BFF.
 
+> **Estado da implementação da Parte 3:** os contratos abaixo descrevem o desenho de domínio, mas esta entrega implementa somente os BFFs, a validação JWT e rotas técnicas sob `/_system` para testar autenticação e autorização. A composição das respostas de negócio não é simulada nem declarada como pronta.
+
 ---
 
 ## Por que as necessidades diferem

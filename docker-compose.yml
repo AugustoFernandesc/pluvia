@@ -6,6 +6,10 @@ include:
   - services/monitoramento/compose.yaml
   - services/notificacoes/compose.yaml
   - infra/rabbitmq/compose.yaml
+  - services/bff-web/compose.yaml
+  - services/bff-mobile/compose.yaml
+  - infra/keycloak/compose.yaml
+  - infra/kong/compose.yaml
 
 networks:
   aplicacao:
