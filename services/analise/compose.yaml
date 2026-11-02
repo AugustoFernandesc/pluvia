@@ -1,0 +1,44 @@
+services:
+  analise:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "8000"
+      POSTGRES_HOST: analise-db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      analise-db:
+        condition: service_healthy
+    healthcheck:
+      # A imagem python:slim não tem wget nem curl. O urlopen falha com 503,
+      # então o healthcheck só passa com o banco de pé e o pgvector instalado.
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - aplicacao
+      - analise-dados
+
+  analise-db:
+    image: pgvector/pgvector:pg17
+    env_file: .env
+    volumes:
+      - analise-db-dados:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - analise-dados
+
+volumes:
+  analise-db-dados:
+
+networks:
+  aplicacao:
+  analise-dados:
