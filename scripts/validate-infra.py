@@ -264,6 +264,10 @@ def validate_compose_root() -> None:
     if "$$status" not in shell_check or " 200 " not in shell_check:
         fail("Healthcheck Compose do Keycloak deve preservar $status para o shell e exigir HTTP 200.")
 
+    keycloak_dockerfile = (ROOT / "infra" / "keycloak" / "Dockerfile").read_text(encoding="utf-8")
+    if "KC_HTTP_MANAGEMENT_HEALTH_ENABLED=true" not in keycloak_dockerfile:
+        fail("A imagem otimizada do Keycloak deve persistir o healthcheck de management usado no runtime.")
+
 
 def validate_ci_workflow() -> None:
     workflow = load_yaml(ROOT / ".github" / "workflows" / "ci.yml")
