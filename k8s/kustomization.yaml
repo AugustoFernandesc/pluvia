@@ -18,3 +18,5 @@ resources:
   - keycloak
   - kong
   - ingress
+  - risco
+  - analise

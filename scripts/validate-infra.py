@@ -224,7 +224,15 @@ def validate_bffs() -> None:
 
 def validate_kubernetes() -> None:
     root = load_yaml(ROOT / "k8s" / "kustomization.yaml")
-    expected = {"bff-web", "bff-mobile", "keycloak", "kong", "ingress"}
+    expected = {
+        "bff-web",
+        "bff-mobile",
+        "keycloak",
+        "kong",
+        "ingress",
+        "analise",
+        "risco",
+    }
     resources = set(root.get("resources", [])) if isinstance(root, dict) else set()
     if not expected.issubset(resources):
         fail("A Kustomization raiz não inclui BFFs, Keycloak, Kong e Ingress.")
@@ -311,6 +319,8 @@ def validate_compose_root() -> None:
         "services/bff-mobile/compose.yaml",
         "infra/keycloak/compose.yaml",
         "infra/kong/compose.yaml",
+        "services/analise/compose.yaml",
+        "services/risco/compose.yaml",
     }
     if not expected.issubset(included):
         fail("Compose raiz não inclui todos os componentes implementados.")

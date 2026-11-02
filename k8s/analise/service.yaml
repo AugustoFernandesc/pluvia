@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: analise
+  labels:
+    app.kubernetes.io/name: analise
+spec:
+  selector:
+    app.kubernetes.io/name: analise
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
