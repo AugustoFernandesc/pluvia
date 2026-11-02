@@ -49,7 +49,7 @@ function PluviaSubjectRateLimitHandler:access(_conf)
   end
 
   -- Replace any client-supplied value only after JWT verification succeeded.
-  local ok, set_error = ngx.req.set_header(RATE_LIMIT_HEADER, subject_hash)
+  local ok, set_error = pcall(ngx.req.set_header, RATE_LIMIT_HEADER, subject_hash)
   if not ok then
     kong.log.err("[pluvia-subject-rate-limit] unable to set internal rate limit header: ", set_error)
     return kong.response.exit(500, { message = "Rate limit identity unavailable" })

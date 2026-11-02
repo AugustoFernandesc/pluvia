@@ -23,7 +23,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "pluvia-bff-web",
+            "included.custom.audience": "pluvia-bff-web",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -41,7 +41,7 @@
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "pluvia-bff-mobile",
+            "included.custom.audience": "pluvia-bff-mobile",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }

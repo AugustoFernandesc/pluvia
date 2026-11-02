@@ -129,7 +129,7 @@ def validate_kong() -> None:
                 "authenticated_jwt_token",
                 "claims.sub",
                 "sha256.sha256_hex",
-                "ngx.req.set_header",
+                "pcall(ngx.req.set_header",
             )
         ):
             fail("O plugin deve usar o JWT validado e sobrescrever o header em prioridade compatível.")
@@ -285,6 +285,22 @@ def validate_kubernetes() -> None:
         )
         if not realm_roles_mapper:
             fail("Keycloak precisa declarar o scope roles com mapper de papéis do realm no access token.")
+        expected_audiences = {
+            "pluvia-bff-web-audience": "pluvia-bff-web",
+            "pluvia-bff-mobile-audience": "pluvia-bff-mobile",
+        }
+        for scope_name, audience in expected_audiences.items():
+            audience_scope = client_scopes.get(scope_name, {})
+            audience_mapper = any(
+                mapper.get("protocolMapper") == "oidc-audience-mapper"
+                and mapper.get("config", {}).get("included.custom.audience") == audience
+                and mapper.get("config", {}).get("access.token.claim") == "true"
+                for mapper in audience_scope.get("protocolMappers", [])
+            )
+            if not audience_mapper:
+                fail(
+                    f"Keycloak scope {scope_name} precisa adicionar a audience customizada {audience} ao access token."
+                )
 
 
 def validate_compose_root() -> None:
