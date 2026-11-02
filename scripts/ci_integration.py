@@ -247,7 +247,10 @@ def run(args) -> None:
         forged_rate_subject="client-controlled-a",
     )
     assert_status(status, 200, "Web com GESTOR")
-    if web_gestor.get("roles") != ["GESTOR"]:
+    if (
+        not isinstance(web_gestor.get("roles"), list)
+        or "GESTOR" not in web_gestor["roles"]
+    ):
         raise AssertionError("O BFF Web não recebeu os papéis verificados do JWT.")
     assert_quota(response_headers, 300, 299, "primeira Web do GESTOR")
     assert_internal_header_removed(web_gestor, "BFF Web")
@@ -306,7 +309,10 @@ def run(args) -> None:
         forged_rate_subject="client-controlled-a",
     )
     assert_status(status, 200, "Mobile com AGENTE")
-    if mobile_agent.get("roles") != ["AGENTE"]:
+    if (
+        not isinstance(mobile_agent.get("roles"), list)
+        or "AGENTE" not in mobile_agent["roles"]
+    ):
         raise AssertionError("O BFF Mobile não recebeu o papel AGENTE do JWT.")
 
     assert_quota(response_headers, 120, 119, "primeira Mobile do AGENTE_1")

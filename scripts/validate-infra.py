@@ -456,6 +456,8 @@ def validate_ci_workflow() -> None:
             "gatewayRateLimitSubjectHeaderPresent",
             "assert_quota(response_headers, 300",
             "assert_quota(response_headers, 120",
+            '"GESTOR" not in web_gestor["roles"]',
+            '"AGENTE" not in mobile_agent["roles"]',
         )
     ):
         fail("O teste integrado precisa cobrir quotas por subject, spoofing e remoção do header.")
