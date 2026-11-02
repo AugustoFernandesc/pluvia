@@ -13,3 +13,5 @@ resources:
   - territorio
   - monitoramento
   - notificacoes
+  - risco
+  - analise
