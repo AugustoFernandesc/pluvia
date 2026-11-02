@@ -42,3 +42,24 @@ Para criar um serviço novo, copie a pasta, troque o nome com `sed -i 's/territo
 - **Liveness não depende do banco.** O `/health` verifica o PostgreSQL; se ele fosse a liveness, uma queda do banco reiniciaria todos os pods do serviço sem resolver nada. Por isso o `/health` fica na readiness, que só tira o pod do balanceamento.
 - **`requests` e `limits` sempre definidos.** Sem eles o escalonamento automático por CPU não funciona.
 - **Banco com uma réplica.** Só o Deployment do serviço escala; o banco é um StatefulSet com volume próprio.
+
+## Serviço com mais de um banco (Risco)
+
+O Risco tem um banco de escrita e um de leitura. Em vez de um `db.yaml`, a pasta tem `db-escrita.yaml` e `db-leitura.yaml`, cada um com StatefulSet, volume e Service headless próprios (`risco-escrita-db` e `risco-leitura-db`, os mesmos hosts do compose).
+
+O ConfigMap e o Secret guardam as variáveis dos dois bancos com prefixo (`POSTGRES_ESCRITA_*` e `POSTGRES_LEITURA_*`). O Deployment do serviço lê tudo com `envFrom`. Cada StatefulSet usa `env` com `configMapKeyRef` e `secretKeyRef` para transformar as do seu banco nas variáveis padrão da imagem (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`). Assim cada banco tem usuário e senha próprios, e o Secret continua sendo um só, gerado pelo Kustomize.
+
+## Banco com extensão (Análise)
+
+A Análise usa `pgvector/pgvector:pg17`. A extensão é criada por um script em `/docker-entrypoint-initdb.d`, que vem do ConfigMap `analise-db-init` gerado no `kustomization.yaml` da pasta. Ele só roda quando o volume é criado.
+
+## Demonstração de escalonamento
+
+```bash
+bash k8s/demo-escalonamento.sh        # 3 réplicas, 30 requisições
+bash k8s/demo-escalonamento.sh 4 60   # 4 réplicas, 60 requisições
+```
+
+O script escala o Deployment da Análise, mostra os pods (o banco continua com 1 réplica), dispara requisições de dentro do cluster pelo Service e conta quantas cada pod atendeu, pelo cabeçalho `X-Atendido-Por`. No fim, mostra os logs de acesso com `--prefix`, filtrando só as chamadas da demonstração.
+
+As requisições saem de um pod temporário porque o `kubectl port-forward svc/...` escolhe um único pod e manda tudo para ele, o que esconderia a divisão da carga.
