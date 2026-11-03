@@ -1,0 +1,64 @@
+services:
+  kong-config:
+    image: python:3.14-alpine
+    env_file: .env
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        python /scripts/bootstrap-kong.py
+        --issuer "$$KEYCLOAK_ISSUER"
+        --jwks-url "$$KEYCLOAK_JWKS_URL"
+        --discovery-url "$$KEYCLOAK_DISCOVERY_URL"
+        --template /gateway/kong.yml.template
+        --renderer /gateway/render-kong.py
+        --output /rendered/kong.yml
+        --key-output /rendered/realm-public-key.pem
+        --timeout-seconds "$$KONG_BOOTSTRAP_TIMEOUT_SECONDS"
+    volumes:
+      - ./bootstrap-kong.py:/scripts/bootstrap-kong.py:ro
+      - ../../gateway:/gateway:ro
+      - kong-config:/rendered
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - aplicacao
+    restart: "no"
+
+  kong:
+    image: pluvia/kong:local
+    build: .
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/rendered/kong.yml
+      KONG_ADMIN_LISTEN: "off"
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 16k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: "8 16k"
+      KONG_NGINX_PROXY_PROXY_BUSY_BUFFERS_SIZE: 32k
+    ports:
+      - "8000:8000"
+    volumes:
+      - kong-config:/etc/kong/rendered:ro
+    depends_on:
+      kong-config:
+        condition: service_completed_successfully
+      bff-web:
+        condition: service_healthy
+      bff-mobile:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aplicacao
+
+volumes:
+  kong-config:
+
+networks:
+  aplicacao:

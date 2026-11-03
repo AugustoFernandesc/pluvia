@@ -4,7 +4,7 @@
 
 **Kong**, em modo declarativo (sem banco próprio), configurado por um único arquivo final `kong.yml`. O repositório versiona o modelo `gateway/kong.yml.template` e o gerador `gateway/render-kong.py`; o arquivo final é gerado antes da inicialização, com a chave pública e o emissor do Keycloak do ambiente.
 
-Kong foi escolhido porque oferece, por configuração e sem código, os três recursos de que a Pluvia precisa na borda: roteamento por caminho, validação de JWT e limitação de taxa. O modo declarativo mantém toda a configuração do gateway no Git, revisável por pull request como qualquer outro código.
+Kong foi escolhido porque oferece por plugins os três recursos de que a Pluvia precisa na borda: roteamento por caminho, validação de JWT e limitação de taxa. Um pequeno plugin local deriva a chave da quota autenticada do `sub` validado, pois o Consumer JWT representa o issuer do realm. O modo declarativo mantém a configuração do gateway no Git, revisável por pull request como qualquer outro código.
 
 ---
 
@@ -27,6 +27,14 @@ Kong foi escolhido porque oferece, por configuração e sem código, os três re
 | `/mobile/v1/*` | BFF Mobile | JWT obrigatório | 120 req/min por usuário |
 | `/auth/*` | Keycloak | Nenhuma | 20 req/min por IP |
 
+### Escopo efetivo do limite autenticado
+
+O plugin JWT associa os tokens ao consumidor `pluvia-keycloak` pelo claim `iss`, compartilhado pelo realm. Esse consumidor continua sendo a credencial de validação; ele não é a chave da quota. O plugin local `pluvia-subject-rate-limit` executa depois do JWT (prioridade 1000 contra 1450) e antes do rate limiting (910). Ele lê o `sub` do token compacto que o plugin JWT já validou, calcula um SHA-256 e sobrescreve `X-Pluvia-RateLimit-Subject` na requisição interna. O plugin `rate-limiting` usa esse valor como chave por header. Assim, subjects distintos têm contadores distintos mesmo que compartilhem o consumidor JWT.
+
+O header recebido do cliente nunca é usado como identidade: o plugin substitui seu conteúdo somente após autenticação JWT bem-sucedida e falha fechado se não houver um `sub` validado. O plugin `request-transformer` remove esse header antes do BFF, tanto no Web quanto no Mobile. A CI cria tokens para subjects distintos, varia valores forjados nesse header e verifica que os contadores avançam apenas para o subject autenticado e que o header não chega ao upstream.
+
+As quotas usam a política `local` do Kong DB-less e a implantação mantém uma réplica. Se o Kong for escalado horizontalmente, cada réplica terá contadores próprios; para uma quota global nesse cenário, será necessário configurar uma política compartilhada, por exemplo Redis.
+
 Os caminhos chegam aos BFFs **sem alteração**: `/web/v1/painel` chega ao BFF Web como `/web/v1/painel`. Cada BFF é dono do seu espaço de caminhos, o que evita reescrita no gateway e mantém o mesmo endereço nos logs do gateway e do BFF.
 
 Quando dois prefixos se sobrepõem, como `/mobile/v1/publico` e `/mobile/v1`, o Kong prioriza o caminho mais longo. A rota pública é avaliada primeiro.
@@ -48,7 +56,7 @@ A comunidade pode consultar o resumo da própria região sem criar conta. Exigir
 | Ponto único de entrada e roteamento | Sim | Kong |
 | Terminação TLS | Sim | Kong |
 | Validação de assinatura e expiração do JWT | Sim | Plugin `jwt` |
-| Limitação de taxa | Sim | Plugin `rate-limiting` |
+| Limitação de taxa | Sim | Plugin `rate-limiting`, com chave autenticada derivada por `pluvia-subject-rate-limit` |
 | Identificador de correlação | Sim | Plugin `correlation-id`, cabeçalho `X-Request-ID` |
 | CORS do painel web | Sim | Plugin `cors` |
 | Limite de tamanho de requisição | Sim | Plugin `request-size-limiting` |
@@ -81,11 +89,17 @@ services:
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
+      - name: pluvia-subject-rate-limit
       - name: rate-limiting
         config:
           minute: 300
-          limit_by: consumer
+          limit_by: header
+          header_name: X-Pluvia-RateLimit-Subject
           policy: local
+      - name: request-transformer
+        config:
+          remove:
+            headers: ["X-Pluvia-RateLimit-Subject"]
       - name: cors
         config:
           origins: ["http://localhost:5173"]
@@ -93,6 +107,11 @@ services:
 
   - name: bff-mobile
     url: http://bff-mobile:3000
+    plugins:
+      - name: request-transformer
+        config:
+          remove:
+            headers: ["X-Pluvia-RateLimit-Subject"]
     routes:
       - name: mobile-publico
         paths: ["/mobile/v1/publico"]
@@ -111,10 +130,12 @@ services:
             config:
               key_claim_name: iss
               claims_to_verify: ["exp"]
+          - name: pluvia-subject-rate-limit
           - name: rate-limiting
             config:
               minute: 120
-              limit_by: consumer
+              limit_by: header
+              header_name: X-Pluvia-RateLimit-Subject
               policy: local
 
   - name: keycloak

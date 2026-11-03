@@ -2,10 +2,18 @@ name: pluvia
 
 include:
   - services/operacoes/compose.yaml
+  - services/equipes/compose.yaml
+  - services/frota/compose.yaml
   - services/territorio/compose.yaml
   - services/monitoramento/compose.yaml
   - services/notificacoes/compose.yaml
+  - services/risco/compose.yaml
+  - services/analise/compose.yaml
   - infra/rabbitmq/compose.yaml
+  - services/bff-web/compose.yaml
+  - services/bff-mobile/compose.yaml
+  - infra/keycloak/compose.yaml
+  - infra/kong/compose.yaml
 
 networks:
   aplicacao:

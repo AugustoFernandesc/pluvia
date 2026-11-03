@@ -1,0 +1,9 @@
+[project]
+name = "analise"
+version = "0.1.0"
+description = "Serviço de Análise do Pluvia (FastAPI + pgvector)"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

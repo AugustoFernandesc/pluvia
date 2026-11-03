@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: risco
+  labels:
+    app.kubernetes.io/name: risco
+spec:
+  selector:
+    app.kubernetes.io/name: risco
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

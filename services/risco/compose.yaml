@@ -1,0 +1,75 @@
+# O Risco aplica CQRS com duas instâncias de PostgreSQL, cada uma com volume,
+# rede e healthcheck próprios:
+#   risco-escrita-db  modelo de escrita (sinalizações e parâmetros)
+#   risco-leitura-db  modelo de leitura (panorama em JSONB)
+#
+# Banco, usuário e senha de cada instância vêm do .env desta pasta, que o
+# Compose usa para interpolar os ${...} abaixo. Nenhuma senha fica neste arquivo.
+services:
+  risco:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "3000"
+      POSTGRES_ESCRITA_HOST: risco-escrita-db
+      POSTGRES_ESCRITA_PORT: "5432"
+      POSTGRES_LEITURA_HOST: risco-leitura-db
+      POSTGRES_LEITURA_PORT: "5432"
+    depends_on:
+      risco-escrita-db:
+        condition: service_healthy
+      risco-leitura-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aplicacao
+      - risco-escrita-dados
+      - risco-leitura-dados
+
+  risco-escrita-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_ESCRITA_DB:?defina POSTGRES_ESCRITA_DB no .env}
+      POSTGRES_USER: ${POSTGRES_ESCRITA_USER:?defina POSTGRES_ESCRITA_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_ESCRITA_PASSWORD:?defina POSTGRES_ESCRITA_PASSWORD no .env}
+    volumes:
+      - risco-escrita-db-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - risco-escrita-dados
+
+  risco-leitura-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_LEITURA_DB:?defina POSTGRES_LEITURA_DB no .env}
+      POSTGRES_USER: ${POSTGRES_LEITURA_USER:?defina POSTGRES_LEITURA_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_LEITURA_PASSWORD:?defina POSTGRES_LEITURA_PASSWORD no .env}
+    volumes:
+      - risco-leitura-db-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - risco-leitura-dados
+
+volumes:
+  risco-escrita-db-dados:
+  risco-leitura-db-dados:
+
+networks:
+  aplicacao:
+  risco-escrita-dados:
+  risco-leitura-dados:
