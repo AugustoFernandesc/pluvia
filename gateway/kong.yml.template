@@ -12,18 +12,32 @@ services:
         config:
           key_claim_name: iss
           claims_to_verify: ["exp"]
+      - name: pluvia-subject-rate-limit
       - name: rate-limiting
         config:
           minute: 300
-          limit_by: consumer
+          limit_by: header
+          header_name: X-Pluvia-RateLimit-Subject
           policy: local
+      - name: request-transformer
+        config:
+          remove:
+            headers: ["X-Pluvia-RateLimit-Subject"]
       - name: cors
         config:
           origins: ["http://localhost:5173"]
           methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+          headers: ["Accept", "Authorization", "Content-Type", "X-Request-ID"]
+          exposed_headers: ["X-Request-ID"]
+          credentials: true
 
   - name: bff-mobile
     url: http://bff-mobile:3000
+    plugins:
+      - name: request-transformer
+        config:
+          remove:
+            headers: ["X-Pluvia-RateLimit-Subject"]
     routes:
       - name: mobile-publico
         paths: ["/mobile/v1/publico"]
@@ -42,10 +56,12 @@ services:
             config:
               key_claim_name: iss
               claims_to_verify: ["exp"]
+          - name: pluvia-subject-rate-limit
           - name: rate-limiting
             config:
               minute: 120
-              limit_by: consumer
+              limit_by: header
+              header_name: X-Pluvia-RateLimit-Subject
               policy: local
 
   - name: keycloak

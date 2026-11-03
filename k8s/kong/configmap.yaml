@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  labels:
+    app.kubernetes.io/name: kong
+data:
+  KEYCLOAK_ISSUER: http://pluvia.local/auth/realms/pluvia
+  KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/pluvia/protocol/openid-connect/certs
+  KEYCLOAK_DISCOVERY_URL: http://keycloak:8080/realms/pluvia/.well-known/openid-configuration
+  KONG_BOOTSTRAP_TIMEOUT_SECONDS: "180"

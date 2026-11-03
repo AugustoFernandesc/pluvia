@@ -10,6 +10,10 @@ include:
   - services/risco/compose.yaml
   - services/analise/compose.yaml
   - infra/rabbitmq/compose.yaml
+  - services/bff-web/compose.yaml
+  - services/bff-mobile/compose.yaml
+  - infra/keycloak/compose.yaml
+  - infra/kong/compose.yaml
 
 networks:
   aplicacao:

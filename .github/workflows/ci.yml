@@ -1,0 +1,318 @@
+name: Pluvia Parte 3 CI
+
+on:
+  push:
+    branches: [BRANCHLUCAS, BranchLucas]
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pluvia-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code:
+    name: BFF matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [bff-web, bff-mobile]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      - name: Instalar dependências bloqueadas
+        run: npm ci
+        working-directory: services/${{ matrix.service }}
+      - name: Lint
+        run: npm run lint
+        working-directory: services/${{ matrix.service }}
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: services/${{ matrix.service }}
+      - name: Testes unitários e HTTP com JWKS efêmero
+        run: npm test -- --runInBand
+        working-directory: services/${{ matrix.service }}
+      - name: Build de produção
+        run: npm run build
+        working-directory: services/${{ matrix.service }}
+
+  static-infrastructure:
+    name: Validação estática
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Verificar sintaxe dos scripts Python
+        run: python -m py_compile scripts/prepare-ci-env.py scripts/validate-infra.py scripts/ci_integration.py infra/kong/bootstrap-kong.py
+      - name: Instalar validador YAML
+        run: python -m pip install PyYAML==6.0.3
+      - name: Testes do servico Analise
+        run: |
+          python -m pip install -r services/analise/requirements-dev.txt
+          python -m compileall -q services/analise/app services/analise/tests
+          python -m pytest -q services/analise/tests
+      - name: Criar arquivos efêmeros para geradores Kustomize
+        run: python scripts/prepare-ci-env.py
+      - name: Testar descoberta JWKS e renderização DB-less
+        run: python -m unittest discover -s infra/kong/tests -v
+      - name: Conferir YAML, JSON, rotas, dependências e referências
+        run: python scripts/validate-infra.py
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.32.2
+      - name: Renderizar a Kustomization raiz
+        run: kubectl kustomize k8s > /dev/null
+
+  service-risco:
+    name: Testes e build do servico Risco
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/risco/package-lock.json
+      - name: Instalar dependencias bloqueadas
+        run: npm ci
+        working-directory: services/risco
+      - name: Testes unitarios
+        run: npm run test:unit -- --runInBand
+        working-directory: services/risco
+      - name: Testes e2e com PostgreSQL em containers
+        run: npm run test:e2e -- --runInBand
+        working-directory: services/risco
+      - name: Build de producao
+        run: npm run build
+        working-directory: services/risco
+
+  docker-integration:
+    name: Docker, Keycloak, Kong e roteamento real
+    runs-on: ubuntu-latest
+    needs: [code, static-infrastructure, service-risco]
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Criar credenciais temporárias e ignoradas
+        run: python scripts/prepare-ci-env.py
+      - name: Validar o Compose completo
+        run: docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml config --quiet
+      - name: Construir e iniciar apenas a infraestrutura deste escopo
+        run: |
+          compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
+          "${compose[@]}" build bff-web bff-mobile keycloak kong analise risco
+          "${compose[@]}" up -d --wait bff-web bff-mobile keycloak-db keycloak
+          # kong-config is a one-shot service. Let Kong's service_completed_successfully
+          # dependency run it, and poll the public endpoint instead of --wait on it.
+          "${compose[@]}" up -d kong
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:8000/auth/realms/pluvia/.well-known/openid-configuration > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Keycloak metadata did not become reachable through Kong." >&2
+            exit 1
+          fi
+      - name: Diagnosticar falha Docker, Keycloak ou Kong
+        if: failure()
+        run: |
+          compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
+          "${compose[@]}" ps --all
+          "${compose[@]}" logs --no-color --timestamps --tail=200 \
+            keycloak keycloak-db kong-config kong bff-web bff-mobile
+      - name: Validar autenticação real e rotas via Kong
+        run: >-
+          python scripts/ci_integration.py
+          --secret-env-file infra/keycloak/.env
+          --keycloak-url http://127.0.0.1:18080
+          --gateway-url http://127.0.0.1:8000
+          --issuer http://localhost:8000/auth/realms/pluvia
+      - name: Remover containers e volumes efêmeros
+        if: always()
+        run: docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml down --volumes --remove-orphans
+
+  kubernetes-kind:
+    name: Kubernetes Kind e Ingress Traefik
+    runs-on: ubuntu-latest
+    needs: [code, static-infrastructure, service-risco]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.32.2
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Instalar Kind v0.27.0 com checksum oficial
+        env:
+          KIND_VERSION: v0.27.0
+        run: |
+          install_dir="$RUNNER_TEMP/pluvia-kind"
+          mkdir -p "$install_dir"
+          cd "$install_dir"
+          curl --fail --location --silent --show-error --retry 3 \
+            --output kind-linux-amd64 \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          curl --fail --location --silent --show-error --retry 3 \
+            --output kind-linux-amd64.sha256sum \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64.sha256sum"
+          grep 'kind-linux-amd64' kind-linux-amd64.sha256sum | sha256sum --check
+          chmod +x kind-linux-amd64
+          mv kind-linux-amd64 kind
+          echo "$install_dir" >> "$GITHUB_PATH"
+          "$install_dir/kind" version
+      - name: Conferir kubectl e criar cluster Kind
+        env:
+          KIND_NODE_IMAGE: kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f
+        run: |
+          kubectl version --client
+          kind version
+          kind create cluster --name pluvia --image "$KIND_NODE_IMAGE" --wait 120s
+          kubectl get nodes -o wide
+      - name: Criar configuração e credenciais efêmeras
+        run: python scripts/prepare-ci-env.py
+      - name: Construir imagens da aplicação
+        run: |
+          docker build -t pluvia/bff-web:local services/bff-web
+          docker build -t pluvia/bff-mobile:local services/bff-mobile
+          docker build -t pluvia/keycloak:local infra/keycloak
+          docker build -t pluvia/kong:local infra/kong
+          kind load docker-image --name pluvia pluvia/bff-web:local pluvia/bff-mobile:local pluvia/keycloak:local pluvia/kong:local
+      - name: Instalar Traefik no cluster temporário
+        run: |
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+          helm upgrade --install traefik traefik/traefik --namespace traefik --create-namespace --version 42.1.3 --set ingressClass.enabled=true --set ingressClass.name=traefik --set service.spec.type=ClusterIP --wait --timeout 180s
+          kubectl rollout status deployment/traefik --namespace traefik --timeout=180s
+          kubectl get ingressclass traefik
+      - name: Criar namespace e segredo temporário do Keycloak
+        run: |
+          kubectl create namespace pluvia
+          kubectl create secret generic keycloak-secret --namespace pluvia --from-env-file=k8s/keycloak/secret.env
+      - name: Subir banco e Keycloak para importar o realm
+        run: |
+          kubectl apply -k k8s/keycloak
+          kubectl rollout status statefulset/keycloak-db --namespace pluvia --timeout=300s
+          kubectl rollout status deployment/keycloak --namespace pluvia --timeout=360s
+      - name: Criar ConfigMap canônico do Kong e Secret da chave pública
+        run: |
+          kubectl create configmap kong-source --namespace pluvia \
+            --from-file=kong.yml.template=gateway/kong.yml.template \
+            --from-file=render-kong.py=gateway/render-kong.py \
+            --from-file=bootstrap-kong.py=infra/kong/bootstrap-kong.py
+          mkdir -p "$RUNNER_TEMP/pluvia-kong"
+          kubectl port-forward --namespace pluvia svc/keycloak 18081:8080 > "$RUNNER_TEMP/keycloak-port-forward.log" 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:18081/realms/pluvia/.well-known/openid-configuration > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Keycloak discovery did not become reachable through port-forward." >&2
+            exit 1
+          fi
+          export KEYCLOAK_ISSUER=http://pluvia.local/auth/realms/pluvia
+          export KEYCLOAK_JWKS_URL=http://127.0.0.1:18081/realms/pluvia/protocol/openid-connect/certs
+          export KEYCLOAK_DISCOVERY_URL=http://127.0.0.1:18081/realms/pluvia/.well-known/openid-configuration
+          python infra/kong/bootstrap-kong.py \
+            --template gateway/kong.yml.template \
+            --renderer gateway/render-kong.py \
+            --output "$RUNNER_TEMP/pluvia-kong/kong.yml" \
+            --key-output "$RUNNER_TEMP/pluvia-kong/realm-public-key.pem"
+          kubectl create secret generic keycloak-jwt-public-key --namespace pluvia \
+            --from-file=realm-public-key.pem="$RUNNER_TEMP/pluvia-kong/realm-public-key.pem"
+      - name: Aplicar recursos e aguardar os componentes próprios
+        run: |
+          kubectl apply -k k8s/bff-web
+          kubectl apply -k k8s/bff-mobile
+          kubectl apply -k k8s/kong
+          kubectl apply -k k8s/ingress
+          for deployment in bff-web bff-mobile kong; do
+            kubectl rollout status "deployment/$deployment" --namespace pluvia --timeout=360s
+          done
+      - name: Smoke test atravessando Ingress, Kong e Keycloak
+        run: |
+          kubectl port-forward --namespace traefik svc/traefik 18080:80 > "$RUNNER_TEMP/traefik-port-forward.log" 2>&1 &
+          ingress_pid=$!
+          kubectl port-forward --namespace pluvia svc/keycloak 18081:8080 > "$RUNNER_TEMP/keycloak-port-forward.log" 2>&1 &
+          keycloak_pid=$!
+          trap 'kill "$ingress_pid" "$keycloak_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail -H 'Host: pluvia.local' http://127.0.0.1:18080/mobile/v1/publico/_system/status > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Traefik ingress did not become reachable through port-forward." >&2
+            exit 1
+          fi
+          python scripts/ci_integration.py \
+            --secret-env-file k8s/keycloak/secret.env \
+            --keycloak-url http://127.0.0.1:18081 \
+            --gateway-url http://127.0.0.1:18080 \
+            --host-header pluvia.local \
+            --issuer http://pluvia.local/auth/realms/pluvia
+      - name: Diagnosticar falha Kubernetes, Kind ou Traefik
+        if: failure()
+        run: |
+          set +e
+          echo '=== Contexto e nós ==='
+          kubectl cluster-info
+          kubectl get nodes -o wide
+          echo '=== Pods e rollouts ==='
+          kubectl get pods -A -o wide
+          kubectl get deployments,statefulsets -A -o wide
+          kubectl get services -A -o wide
+          echo '=== Events ==='
+          kubectl get events -A --sort-by='.metadata.creationTimestamp'
+          kubectl describe services -A
+          echo '=== Ingress ==='
+          kubectl get ingress,ingressclass -A -o wide
+          kubectl describe ingress -A
+          echo '=== Describe pods e logs de todos os containers/initContainers ==='
+          pods="$(kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name' --no-headers 2>/dev/null)"
+          while read -r namespace pod; do
+            [ -n "$namespace" ] || continue
+            echo "--- describe pod/$pod namespace=$namespace ---"
+            kubectl describe pod "$pod" --namespace "$namespace"
+            echo "--- logs pod/$pod namespace=$namespace ---"
+            kubectl logs "$pod" --namespace "$namespace" --all-containers --prefix --tail=200
+            echo "--- previous logs pod/$pod namespace=$namespace ---"
+            kubectl logs "$pod" --namespace "$namespace" --all-containers --previous --prefix --tail=200
+          done <<< "$pods"
+      - name: Excluir cluster temporário
+        if: always()
+        run: |
+          if kind get clusters | grep --quiet --line-regexp pluvia; then
+            kind delete cluster --name pluvia
+          fi
