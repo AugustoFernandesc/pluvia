@@ -513,24 +513,48 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 
 ## ⚙️ Execução do projeto
 
-Requisito: Docker com Compose v2.20 ou superior.
+Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, um cluster local (o do Docker Desktop serve), `kubectl` e Helm.
 
-Cada componente tem o próprio `.env`, que não é versionado. Crie-o a partir do `.env.example` e troque a senha antes de subir:
+### Docker Compose
+
+Cada componente tem o próprio `.env`, que não é versionado. Crie-os a partir dos `.env.example` e troque as senhas antes de subir:
 
 ```bash
-cp services/operacoes/.env.example services/operacoes/.env
-cp infra/rabbitmq/.env.example infra/rabbitmq/.env
+for f in services/*/.env.example infra/*/.env.example; do cp -n "$f" "${f%.example}"; done
 docker compose up -d --build
 docker compose ps
 ```
 
-O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Por enquanto sobem o serviço de Operações, o banco dele e o RabbitMQ, que devem aparecer como `healthy`. Os serviços não publicam porta no host. Para conferir o `/health`:
+O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Sobem os serviços de domínio, cada um com o próprio banco, e o RabbitMQ:
+
+| Serviço | Banco |
+| ------- | ----- |
+| Território | PostgreSQL com PostGIS |
+| Monitoramento | PostgreSQL com TimescaleDB |
+| Risco | dois PostgreSQL, escrita e leitura |
+| Análise (Python) | PostgreSQL com pgvector |
+| Operações, Equipes, Frota e Notificações | PostgreSQL |
+
+Todos devem aparecer como `healthy`. Cada banco fica numa rede exclusiva com o seu serviço, e os serviços de domínio não publicam porta no host. Para conferir o `/health`:
 
 ```bash
 docker compose exec operacoes wget -qO- 127.0.0.1:3000/health
 ```
 
 Para derrubar, use `docker compose down`. O banco de cada serviço fica num volume nomeado, então os dados permanecem. Para apagá-los, use `docker compose down -v`.
+
+### Kubernetes
+
+Os manifestos ficam em `k8s/`, um diretório por componente, e usam as imagens geradas pelo `docker compose build`. As senhas vêm de um `secret.env` por pasta, também fora do Git:
+
+```bash
+for f in k8s/*/secret.env.example; do cp -n "$f" "${f%.example}"; done
+docker compose build
+kubectl apply -k k8s
+kubectl -n pluvia get pods
+```
+
+As regras dos manifestos, a demonstração de escalonamento (`bash k8s/demo-escalonamento.sh`) e a ordem de subida estão em [`k8s/README.md`](k8s/README.md).
 
 Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-nestjs/README.md).
 
@@ -559,6 +583,12 @@ git config user.email "email-da-conta@github.com"
 ```text
 pluvia/
 ├── README.md                  # Este documento
+├── docker-compose.yml         # Compose raiz, com include de cada componente
+├── templates/servico-nestjs/  # Modelo de serviço NestJS
+├── services/                  # Um diretório por serviço, com Dockerfile e compose.yaml
+├── infra/                     # Componentes de infraestrutura, como o RabbitMQ
+├── gateway/                   # Template e gerador da configuração do Kong
+├── k8s/                       # Manifestos Kubernetes (Kustomize)
 └── docs/
     ├── logoPluvia.png         # Logo do projeto
     ├── referencias.md         # Fichamento das fontes institucionais
