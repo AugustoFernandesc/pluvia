@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: operacoes-db
+  labels:
+    app.kubernetes.io/name: operacoes-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: operacoes-db
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: operacoes-db
+  labels:
+    app.kubernetes.io/name: operacoes-db
+spec:
+  serviceName: operacoes-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: operacoes-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: operacoes-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: operacoes-config
+            - secretRef:
+                name: operacoes-secret
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          volumeMounts:
+            - name: dados
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: dados
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
