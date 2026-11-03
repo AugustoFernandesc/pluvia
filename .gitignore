@@ -11,3 +11,4 @@ openspec/
 secret.env
 **/realm-public-key.pem
 **/kong.yml
+.ferramentas/
