@@ -34,12 +34,18 @@ kubectl -n "$NS" get statefulset "${SERVICO}-db"
 titulo "Disparando ${REQUISICOES} requisições pelo Service ${SERVICO}:${PORTA}"
 # Cada curl abre uma conexão nova, e o kube-proxy escolhe um pod por conexão.
 # O cabeçalho X-Atendido-Por traz o hostname, que é o nome do pod.
-kubectl -n "$NS" run carga-demo --rm -i --quiet --restart=Never \
+# A saída é lida com `kubectl logs` depois que o pod termina: com `run -i`, o
+# attach chega depois das primeiras linhas e parte da contagem se perde.
+kubectl -n "$NS" delete pod carga-demo --ignore-not-found >/dev/null
+kubectl -n "$NS" run carga-demo --quiet --restart=Never \
   --image=curlimages/curl:8.11.1 --command -- sh -c "
     for i in \$(seq ${REQUISICOES}); do
       curl -s -o /dev/null -D - 'http://${SERVICO}:${PORTA}/health?origem=demo' \
         | tr -d '\r' | sed -n 's/^x-atendido-por: //Ip'
-    done" | sort | uniq -c | awk '{ printf "  %-40s %s requisições\n", $2, $1 }'
+    done" >/dev/null
+kubectl -n "$NS" wait pod/carga-demo --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s >/dev/null
+kubectl -n "$NS" logs carga-demo | sort | uniq -c | awk '{ printf "  %-40s %s requisições\n", $2, $1 }'
+kubectl -n "$NS" delete pod carga-demo --wait=false >/dev/null
 
 titulo "Logs de acesso de cada pod (só as chamadas da demonstração)"
 # --prefix mostra o pod de origem de cada linha. O filtro tira as chamadas

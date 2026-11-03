@@ -20,3 +20,6 @@ resources:
   - ingress
   - risco
   - analise
+  - operacoes
+  - equipes
+  - frota

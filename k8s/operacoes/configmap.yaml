@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: operacoes-config
+  labels:
+    app.kubernetes.io/name: operacoes
+data:
+  PORT: "3000"
+  POSTGRES_HOST: operacoes-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: operacoes
+  POSTGRES_USER: operacoes
+  PGDATA: /var/lib/postgresql/data/pgdata

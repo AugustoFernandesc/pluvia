@@ -70,6 +70,10 @@ spec:
               value: "8 16k"
             - name: KONG_NGINX_PROXY_PROXY_BUSY_BUFFERS_SIZE
               value: 32k
+            # O padrão "auto" abre um worker por CPU do nó; em máquinas com
+            # muitos núcleos isso estoura o limite de memória do pod.
+            - name: KONG_NGINX_WORKER_PROCESSES
+              value: "2"
           ports:
             - name: proxy
               containerPort: 8000
