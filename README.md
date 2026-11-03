@@ -513,7 +513,7 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 
 ## ⚙️ Execução do projeto
 
-Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, um cluster local (o do Docker Desktop serve), `kubectl` e Helm. O sistema completo pede cerca de 3,2 GB de memória nos `requests`, então dê pelo menos 6 GB ao Docker.
+Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, também um cluster local (o do Docker Desktop serve), `kubectl`, Helm e Python 3; no Windows, rode os comandos no Git Bash. O sistema completo pede cerca de 3,2 GB de memória nos `requests`, então dê pelo menos 6 GB ao Docker.
 
 ### Docker Compose
 
@@ -545,16 +545,19 @@ Para derrubar, use `docker compose down`. O banco de cada serviço fica num volu
 
 ### Kubernetes
 
-Os manifestos ficam em `k8s/`, um diretório por componente, e usam as imagens geradas pelo `docker compose build`. As senhas vêm de um `secret.env` por pasta, também fora do Git:
+Os manifestos ficam em `k8s/`, um diretório por componente, e usam as imagens geradas pelo `docker compose build`. Um script sobe tudo, na ordem certa:
 
 ```bash
-for f in k8s/*/secret.env.example; do cp -n "$f" "${f%.example}"; done
-docker compose build
-kubectl apply -k k8s
-kubectl -n pluvia get pods
+bash scripts/subir-k8s.sh
 ```
 
-As regras dos manifestos, a demonstração de escalonamento (`bash k8s/demo-escalonamento.sh`) e a ordem de subida estão em [`k8s/README.md`](k8s/README.md).
+Ele cria os `.env` e `secret.env` que faltarem, com senhas aleatórias e fora do Git, builda as imagens, instala o Traefik, sobe o Keycloak, gera a chave pública do realm para o Kong e aplica a Kustomization raiz. No fim, todos os pods do namespace `pluvia` devem estar `Running 1/1`, e o Ingress atende em `http://localhost` com o host `pluvia.local`:
+
+```bash
+curl -H 'Host: pluvia.local' http://localhost/mobile/v1/publico/_system/status
+```
+
+As regras dos manifestos e a demonstração de escalonamento (`bash k8s/demo-escalonamento.sh`) estão em [`k8s/README.md`](k8s/README.md).
 
 Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-nestjs/README.md).
 

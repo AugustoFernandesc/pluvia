@@ -4,15 +4,15 @@ Manifestos do Pluvia organizados por componente com Kustomize (embutido no `kube
 
 ## Subir
 
-As imagens dos serviços são as que `docker compose build` gera (`pluvia-<servico>:latest`). Em clusters que não compartilham as imagens do Docker local, como o Kind, carregue-as antes com `kind load docker-image`.
+Na raiz do repositório:
 
 ```bash
-docker compose build
-kubectl apply -k k8s
-kubectl -n pluvia get pods
+bash scripts/subir-k8s.sh
 ```
 
-A Kustomization raiz inclui os serviços de todos os integrantes. Antes de aplicá-la, crie os Secrets locais e prepare/carregue as imagens de todos os serviços. O job de CI da Parte 3 aplica separadamente seus componentes de borda, conforme o guia acima.
+O script segue a ordem do guia acima. A Kustomization raiz não sobe sozinha num cluster vazio, porque o Kong precisa da chave pública do realm, e ela só existe depois que o Keycloak está de pé. Por isso o Keycloak sobe primeiro, a chave é lida pelo `infra/kong/bootstrap-kong.py` e só então vem o `kubectl apply -k k8s`.
+
+As imagens dos serviços são as que `docker compose build` gera (`pluvia-<servico>:latest`). Em clusters que não compartilham as imagens do Docker local, como o Kind, carregue-as com `kind load docker-image` depois do build.
 
 Para testar um serviço sem Ingress:
 
