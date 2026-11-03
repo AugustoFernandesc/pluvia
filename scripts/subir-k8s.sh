@@ -20,9 +20,49 @@ ISSUER=http://pluvia.local/auth/realms/pluvia
 passo() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 
 if python3 -c '' 2>/dev/null; then PY=python3; else PY=python; fi
-for cmd in docker kubectl helm "$PY"; do
+for cmd in docker kubectl curl "$PY"; do
   command -v "$cmd" >/dev/null || { echo "Falta instalar: $cmd" >&2; exit 1; }
 done
+
+# Sem Helm instalado, baixa a versão fixada abaixo do site oficial para
+# .ferramentas/ (ignorada pelo Git) e confere o SHA-256 antes de usar.
+HELM_VERSAO=v3.17.3
+garantir_helm() {
+  command -v helm >/dev/null && return
+  local destino=.ferramentas/helm-$HELM_VERSAO so arq ext
+  case "$(uname -s)" in
+    Linux) so=linux ;;
+    Darwin) so=darwin ;;
+    MINGW* | MSYS* | CYGWIN*) so=windows ;;
+    *) echo "Sistema não suportado para baixar o Helm: $(uname -s)" >&2; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64 | amd64) arq=amd64 ;;
+    aarch64 | arm64) arq=arm64 ;;
+    *) echo "Arquitetura não suportada para baixar o Helm: $(uname -m)" >&2; exit 1 ;;
+  esac
+  [ "$so" = windows ] && ext=zip || ext=tar.gz
+  if [ ! -d "$destino/$so-$arq" ]; then
+    passo "Baixando Helm $HELM_VERSAO"
+    local pacote="helm-$HELM_VERSAO-$so-$arq.$ext"
+    mkdir -p "$destino"
+    curl -fsSL -o "$destino/$pacote" "https://get.helm.sh/$pacote"
+    curl -fsSL -o "$destino/$pacote.sha256sum" "https://get.helm.sh/$pacote.sha256sum"
+    "$PY" - "$destino" "$pacote" <<'EOF'
+import hashlib, pathlib, shutil, sys
+destino, pacote = pathlib.Path(sys.argv[1]), sys.argv[2]
+esperado = (destino / f"{pacote}.sha256sum").read_text().split()[0]
+obtido = hashlib.sha256((destino / pacote).read_bytes()).hexdigest()
+if obtido != esperado:
+    sys.exit(f"SHA-256 do Helm não confere: {obtido} != {esperado}")
+shutil.unpack_archive(str(destino / pacote), str(destino))
+EOF
+    rm -f "$destino/$pacote" "$destino/$pacote.sha256sum"
+  fi
+  chmod +x "$destino/$so-$arq/"helm* 2>/dev/null || true
+  PATH="$PWD/$destino/$so-$arq:$PATH"
+}
+garantir_helm
 kubectl get nodes >/dev/null || { echo "O kubectl não alcança nenhum cluster." >&2; exit 1; }
 
 passo "Arquivos de ambiente"
