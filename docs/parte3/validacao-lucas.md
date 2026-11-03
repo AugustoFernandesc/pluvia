@@ -187,11 +187,12 @@ Localmente, os testes dos BFFs usam uma chave RSA e um servidor JWKS HTTP efême
 - **Docker e autenticação real:** gera credenciais descartáveis no runner, valida Compose, constrói o Kong com o plugin local, sobe Keycloak/Postgres/Kong/BFFs, obtém JWTs do Keycloak e verifica issuer, papéis, 401/403, rota pública, contadores por subject, resistência a headers forjados e encaminhamento pelo Kong.
 - **Kind e Traefik:** constrói/carrega as imagens, instala e aguarda o chart Traefik, confirma a IngressClass, aplica Keycloak/Kong/BFFs e executa o mesmo teste de autenticação e rate limit através do Ingress. O cluster é removido ao final.
 
-Os gatilhos são push em `BranchLucas`/`BRANCHLUCAS`, Pull Request para `develop` e execução manual. Os jobs não usam secrets permanentes do GitHub. Clientes de teste e credenciais são temporários; o job Docker remove volumes e o job Kind exclui o cluster. A criação deste workflow não significa que ele já foi executado: os resultados só existirão após o push ou execução manual no GitHub, com Actions habilitado.
+Os gatilhos são push em `BranchLucas`/`BRANCHLUCAS`, Pull Request para `develop` e execução manual. Os jobs não usam secrets permanentes do GitHub. Clientes de teste e credenciais são temporários; o job Docker remove volumes e o job Kind exclui o cluster. Todos os jobs passaram no Pull Request #20.
 
 ## Limitações e diagnóstico
 
-- **NÃO EXECUTADO localmente:** validação com Docker daemon, startup real do Compose, carregamento do plugin Lua no Kong, Keycloak/Kong integrados, criação de Pods, probes e tráfego real pelo Ingress. A máquina desta entrega não tem Docker, kubectl ou Helm; o workflow hospedado é o mecanismo de execução posterior e ainda precisa rodar no GitHub Actions.
+- **Executado localmente:** Compose completo e Kubernetes do Docker Desktop (kubeadm, um nó, 6 GB), seguindo este guia do zero, com Traefik pelo Helm. Os 23 pods ficam `Running 1/1` e `scripts/ci_integration.py` passa pelo Ingress (`--gateway-url http://127.0.0.1:80`, sem port-forward, porque o Docker Desktop publica o LoadBalancer do Traefik em `localhost`).
+- **Kong reiniciando com `OOMKilled`:** o padrão do Kong abre um worker por CPU do nó, e em máquina com muitos núcleos os workers passam do limite de 512Mi. Por isso o Deployment fixa `KONG_NGINX_WORKER_PROCESSES=2`.
 - **401:** confira issuer, audience, assinatura, expiração e se o bearer foi enviado. A rota `/auth` precisa anunciar o issuer externo com esse prefixo.
 - **403:** a assinatura foi aceita, mas o token não contém o papel autorizado em `realm_access.roles`.
 - **503 no BFF:** verifique se o endereço interno de JWKS (`keycloak:8080` no Compose/Kubernetes) está acessível e se Keycloak já publicou uma chave RS256.
@@ -201,4 +202,4 @@ Os gatilhos são push em `BranchLucas`/`BRANCHLUCAS`, Pull Request para `develop
 
 ## Por que Docker multi-stage
 
-Cada Dockerfile separa compilação TypeScript, instalação de dependências de produção e execução. A imagem final não carrega compilador, ferramentas de teste ou dependências de desenvolvimento, e usa usuário sem privilégios. Essa configuração reduz a superfície e o conteúdo da imagem; tamanho real de imagem não foi medido nesta máquina, sem Docker.
+Cada Dockerfile separa compilação TypeScript, instalação de dependências de produção e execução. A imagem final não carrega compilador, ferramentas de teste ou dependências de desenvolvimento, e usa usuário sem privilégios. Essa configuração reduz a superfície e o conteúdo da imagem: a imagem final de cada BFF tem 276 MB.

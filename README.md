@@ -513,7 +513,7 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 
 ## ⚙️ Execução do projeto
 
-Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, um cluster local (o do Docker Desktop serve), `kubectl` e Helm.
+Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, um cluster local (o do Docker Desktop serve), `kubectl` e Helm. O sistema completo pede cerca de 3,2 GB de memória nos `requests`, então dê pelo menos 6 GB ao Docker.
 
 ### Docker Compose
 
@@ -562,7 +562,7 @@ Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-
 
 ## Parte 3: execução e validação
 
-O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e as limitações do que ainda não foi executado em runtime.
+O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e o diagnóstico de falhas comuns.
 
 Os BFFs não possuem banco de dados. Nesta etapa, as rotas sob `/_system` são verificações técnicas; os contratos de negócio permanecem descritos em `docs/api/` e não são apresentados como implementados.
 
