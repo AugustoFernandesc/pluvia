@@ -3,21 +3,35 @@
 ### Monitoramento e apoio à decisão para prevenção de alagamentos urbanos
 > Plataforma que consolida dados públicos de chuva observada e prevista, histórico de ocorrências, vulnerabilidade territorial e leituras de sensores de nível, aplicando Inteligência Artificial para produzir análises contextuais de risco e para acompanhar as ações preventivas decorrentes dessas análises.
 
-**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 2: Arquitetura
+**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 3: Containerização e Orquestração
 
 > ⚠️ A Pluvia **não** prevê alagamentos, **não** emite alerta oficial à população e **não** substitui a Defesa Civil. A plataforma utiliza previsões meteorológicas produzidas por órgãos oficiais como mais uma evidência, organiza esse conjunto, produz análises e apoia o planejamento de ações preventivas de rotina, como vistoria, inspeção e manutenção de drenagem, definidas pelo próprio município. Os alertas emitidos pela plataforma são **operacionais e internos**, dirigidos à equipe técnica e aos agentes cadastrados. A decisão e a resposta a emergências permanecem humanas e institucionais.
 
 ---
 
-## ⭐ Destaque da Parte 2: SAGA
+## 🚀 Parte 3: subir o sistema
 
-**Abertura de ação preventiva**, uma transação que atravessa três serviços: **Operações** registra a ação, **Equipes** reserva a equipe e **Frota** reserva o veículo. Se uma reserva falhar, as anteriores são desfeitas por compensação.
+Requisitos: Docker com Compose, `kubectl` com um cluster local (o do Docker Desktop serve), `curl` e Python 3. No Windows, use o Git Bash. O Helm é baixado pelo script se não estiver instalado.
 
-- **Orquestrada**, com Operações como orquestrador e justificativa frente à coreografada.
-- Passos T1 a T6 com compensações definidas, ponto de não retorno em T4 e idempotência por `sagaId`.
-- Caminho feliz e dois cenários de falha com compensação (sem veículo disponível e timeout), em diagramas de sequência.
+```bash
+# Docker Compose
+for f in services/*/.env.example infra/*/.env.example; do cp -n "$f" "${f%.example}"; done
+docker compose up -d --build
 
-📄 Documento completo: [**docs/arquitetura/06-saga.md**](docs/arquitetura/06-saga.md)
+# Kubernetes
+bash scripts/subir-k8s.sh
+bash k8s/demo-escalonamento.sh
+```
+
+| Item da Parte 3 | Onde |
+|---|---|
+| Dockerfile por serviço, multi-stage | `services/*/Dockerfile`, `infra/*/Dockerfile` e [ganho medido](templates/servico-nestjs/README.md) |
+| Compose com volumes e redes | [`docker-compose.yml`](docker-compose.yml) e o `compose.yaml` de cada componente |
+| Deployments, Services, ConfigMaps e Secrets | [`k8s/`](k8s/README.md) |
+| Ingress e roteamento | [`k8s/ingress`](k8s/ingress) e [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md) |
+| Escalonamento | [`k8s/demo-escalonamento.sh`](k8s/demo-escalonamento.sh) |
+
+Detalhes na seção **Execução do projeto**, mais abaixo. A arquitetura da Parte 2 continua em [`docs/arquitetura`](docs/arquitetura/README.md).
 
 ---
 
