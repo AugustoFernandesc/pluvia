@@ -11,6 +11,8 @@
 
 ## 🚀 Parte 3: subir o sistema
 
+🎬 **Vídeo da apresentação:** [`docs/parte3/video/Pluvia_Parte3.mp4`](docs/parte3/video/Pluvia_Parte3.mp4) (9min38s)
+
 Requisitos: Docker com Compose, `kubectl` com um cluster local (o do Docker Desktop serve), `curl` e Python 3. No Windows, use o Git Bash. O Helm é baixado pelo script se não estiver instalado.
 
 ```bash
@@ -30,6 +32,7 @@ bash k8s/demo-escalonamento.sh
 | Deployments, Services, ConfigMaps e Secrets | [`k8s/`](k8s/README.md) |
 | Ingress e roteamento | [`k8s/ingress`](k8s/ingress) e [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md) |
 | Escalonamento | [`k8s/demo-escalonamento.sh`](k8s/demo-escalonamento.sh) |
+| Vídeo da apresentação | [`docs/parte3/video/Pluvia_Parte3.mp4`](docs/parte3/video/Pluvia_Parte3.mp4) |
 
 Detalhes na seção **Execução do projeto**, mais abaixo. A arquitetura da Parte 2 continua em [`docs/arquitetura`](docs/arquitetura/README.md).
 
