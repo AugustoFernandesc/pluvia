@@ -30,7 +30,7 @@ bash k8s/demo-escalonamento.sh
 | Dockerfile por serviço, multi-stage | `services/*/Dockerfile`, `infra/*/Dockerfile` e [ganho medido](templates/servico-nestjs/README.md) |
 | Compose com volumes e redes | [`docker-compose.yml`](docker-compose.yml) e o `compose.yaml` de cada componente |
 | Deployments, Services, ConfigMaps e Secrets | [`k8s/`](k8s/README.md) |
-| Ingress e roteamento | [`k8s/ingress`](k8s/ingress) e [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md) |
+| Ingress e roteamento | [`k8s/ingress`](k8s/ingress) e [`docs/parte3/validacao-k8s.md`](docs/parte3/validacao-k8s.md) |
 | Escalonamento | [`k8s/demo-escalonamento.sh`](k8s/demo-escalonamento.sh) |
 | Vídeo da apresentação | [YouTube](https://youtu.be/OzFVxttzx_M) e [`docs/parte3/video.md`](docs/parte3/video.md) |
 
@@ -582,7 +582,7 @@ Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-
 
 ## Parte 3: execução e validação
 
-O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-lucas.md`](docs/parte3/validacao-lucas.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e o diagnóstico de falhas comuns.
+O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-k8s.md`](docs/parte3/validacao-k8s.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e o diagnóstico de falhas comuns.
 
 Os BFFs não possuem banco de dados. Nesta etapa, as rotas sob `/_system` são verificações técnicas; os contratos de negócio permanecem descritos em `docs/api/` e não são apresentados como implementados.
 
@@ -641,7 +641,7 @@ pluvia/
     │   ├── bff-web.yaml
     │   └── bff-mobile.yaml
     └── parte3/                # Guia de execução e validação da Parte 3
-        └── validacao-lucas.md
+        └── validacao-k8s.md
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Kubernetes
 
-Manifestos do Pluvia organizados por componente com Kustomize (embutido no `kubectl`). O roteiro de bootstrap completo de Keycloak, Kong, Traefik e dos BFFs está em [`docs/parte3/validacao-lucas.md`](../docs/parte3/validacao-lucas.md).
+Manifestos do Pluvia organizados por componente com Kustomize (embutido no `kubectl`). O roteiro de bootstrap completo de Keycloak, Kong, Traefik e dos BFFs está em [`docs/parte3/validacao-k8s.md`](../docs/parte3/validacao-k8s.md).
 
 ## Subir
 
