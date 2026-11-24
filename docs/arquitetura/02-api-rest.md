@@ -19,6 +19,153 @@ Os arquivos podem ser abertos no [Swagger Editor](https://editor.swagger.io). Na
 
 ---
 
+## O que cada serviço oferece
+
+Resumo, em linguagem simples, do que dá para fazer em cada serviço. Os detalhes técnicos (campos, exemplos e erros) estão nos arquivos `.yaml`.
+
+**Como ler a coluna Método:** `GET` consulta, `POST` cria ou executa uma ação, `PUT` substitui uma informação inteira, `PATCH` altera parte de um cadastro e `DELETE` remove. Um trecho entre chaves, como `{regiaoId}`, é trocado pelo código do item.
+
+### BFF Web (painel do gestor e do técnico)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/painel` | Mostra a situação de todas as regiões numa tela só |
+| `GET` | `/regioes/{regiaoId}` | Mostra tudo sobre uma região: chuva, risco, ocorrências e ações |
+| `GET` | `/planejamento/disponibilidade` | Mostra quais equipes e veículos estão livres numa data |
+| `GET` | `/acoes` | Lista as ações preventivas |
+| `POST` | `/acoes` | Pede uma ação preventiva; o sistema tenta reservar equipe e veículo |
+| `GET` | `/acoes/{acaoId}` | Mostra uma ação e o que ainda pode ser feito com ela |
+| `POST` | `/acoes/{acaoId}/cancelamento` | Cancela uma ação já confirmada (só o gestor) |
+| `GET` | `/sinalizacoes` | Lista os alertas de risco gerados pelo sistema |
+| `POST` | `/sinalizacoes/{sinalizacaoId}/reconhecimento` | Marca que o alerta foi visto |
+| `GET` | `/ocorrencias` | Lista os problemas relatados, inclusive os que aguardam conferência |
+| `POST` | `/ocorrencias/{ocorrenciaId}/validacao` | Confirma ou descarta um problema relatado (só o técnico) |
+
+### BFF Mobile (aplicativo do agente de campo e do cidadão)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/publico/regioes/localizar` | Descobre em que região a pessoa está, pelo GPS do celular |
+| `GET` | `/publico/regioes/{regiaoId}/resumo` | Explica a situação da região em linguagem simples, sem login |
+| `GET` | `/minhas-acoes` | Lista as tarefas da equipe do agente |
+| `GET` | `/acoes/{acaoId}` | Mostra uma tarefa e os botões que o agente pode usar |
+| `POST` | `/acoes/{acaoId}/inicio` | Avisa que a equipe começou o trabalho no local |
+| `POST` | `/acoes/{acaoId}/conclusao` | Avisa que terminou e conta o que foi feito |
+| `POST` | `/ocorrencias` | Relata um problema visto na rua, como um bueiro entupido |
+| `GET` | `/notificacoes` | Mostra os avisos recebidos pelo agente |
+| `POST` | `/notificacoes/{notificacaoId}/leitura` | Marca um aviso como lido |
+
+### Território (regiões e ocorrências)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/regioes` | Lista as regiões monitoradas da cidade |
+| `POST` | `/regioes` | Cadastra uma região nova |
+| `GET` | `/regioes/localizacao` | Diz em que região fica um ponto do mapa |
+| `GET` | `/regioes/{regiaoId}` | Mostra os dados de uma região |
+| `PATCH` | `/regioes/{regiaoId}` | Corrige dados de uma região |
+| `GET` | `/regioes/{regiaoId}/vulnerabilidade` | Mostra o quanto a região é frágil a alagamentos |
+| `PUT` | `/regioes/{regiaoId}/vulnerabilidade` | Define essa fragilidade |
+| `GET` | `/ocorrencias` | Lista os problemas relatados |
+| `POST` | `/ocorrencias` | Relata um problema |
+| `GET` | `/ocorrencias/{ocorrenciaId}` | Mostra um problema relatado |
+| `POST` | `/ocorrencias/{ocorrenciaId}/validacao` | Registra se o problema foi confirmado ou descartado |
+| `POST` | `/importacoes` | Importa o histórico oficial de alagamentos |
+| `GET` | `/importacoes/{importacaoId}` | Mostra o andamento da importação |
+
+### Monitoramento (chuva e sensores)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/estacoes` | Lista as estações que medem chuva |
+| `GET` | `/estacoes/{estacaoId}` | Mostra uma estação |
+| `GET` | `/sensores` | Lista os sensores de nível de água |
+| `POST` | `/sensores` | Cadastra um sensor |
+| `GET` | `/sensores/{sensorId}` | Mostra um sensor e a última medição |
+| `GET` | `/leituras` | Mostra as medições de um período |
+| `GET` | `/regioes/{regiaoId}/acumulados` | Mostra quanto choveu na região nas últimas horas |
+| `GET` | `/previsoes` | Mostra as previsões do tempo em vigor |
+| `GET` | `/previsoes/{previsaoId}` | Mostra uma previsão |
+| `POST` | `/ingestoes` | Manda buscar dados novos de uma fonte agora |
+| `GET` | `/ingestoes/{ingestaoId}` | Mostra o andamento dessa busca |
+
+### Risco (nível de atenção)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/panoramas` | Lista as regiões da mais perigosa para a menos perigosa |
+| `GET` | `/panoramas/{regiaoId}` | Mostra o risco de uma região e o motivo |
+| `GET` | `/panoramas/{regiaoId}/cenario-previsto` | Mostra o que a previsão do tempo significa para a região |
+| `GET` | `/regioes/{regiaoId}/parametros` | Mostra os limites usados para calcular o risco |
+| `PUT` | `/regioes/{regiaoId}/parametros` | Ajusta esses limites |
+| `GET` | `/sinalizacoes` | Lista os alertas de risco |
+| `GET` | `/sinalizacoes/{sinalizacaoId}` | Mostra um alerta |
+| `POST` | `/sinalizacoes/{sinalizacaoId}/reconhecimento` | O técnico avisa que viu o alerta |
+| `POST` | `/sinalizacoes/{sinalizacaoId}/encerramento` | O técnico encerra o alerta |
+
+### Operações (ações preventivas)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `POST` | `/acoes` | Pede uma ação preventiva, como limpar um bueiro antes da chuva |
+| `GET` | `/acoes` | Lista as ações |
+| `GET` | `/acoes/{acaoId}` | Mostra uma ação e os próximos passos possíveis |
+| `POST` | `/acoes/{acaoId}/inicio` | Registra que o trabalho começou |
+| `POST` | `/acoes/{acaoId}/conclusao` | Registra que o trabalho terminou e o resultado |
+| `POST` | `/acoes/{acaoId}/cancelamento` | Cancela uma ação confirmada |
+| `GET` | `/acoes/{acaoId}/saga` | Mostra em que passo está a reserva de equipe e veículo |
+
+### Equipes
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/equipes` | Lista as equipes |
+| `POST` | `/equipes` | Cadastra uma equipe |
+| `GET` | `/equipes/{equipeId}` | Mostra uma equipe |
+| `PATCH` | `/equipes/{equipeId}` | Corrige dados de uma equipe |
+| `GET` | `/equipes/{equipeId}/disponibilidade` | Mostra em que turnos a equipe está livre numa data |
+| `GET` | `/disponibilidade` | Mostra quais equipes estão livres numa data |
+| `GET` | `/equipes/{equipeId}/indisponibilidades` | Lista folgas e afastamentos da equipe |
+| `POST` | `/equipes/{equipeId}/indisponibilidades` | Registra um período em que a equipe não pode trabalhar |
+| `GET` | `/reservas` | Lista as equipes já reservadas |
+| `GET` | `/reservas/{reservaId}` | Mostra uma reserva |
+
+### Frota (veículos e equipamentos)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/recursos` | Lista veículos e equipamentos |
+| `POST` | `/recursos` | Cadastra um veículo ou equipamento |
+| `GET` | `/recursos/{recursoId}` | Mostra um veículo ou equipamento |
+| `PATCH` | `/recursos/{recursoId}` | Corrige dados dele |
+| `GET` | `/recursos/{recursoId}/disponibilidade` | Mostra em que turnos ele está livre numa data |
+| `GET` | `/disponibilidade` | Mostra quais veículos estão livres numa data |
+| `GET` | `/recursos/{recursoId}/manutencoes` | Lista as manutenções dele |
+| `POST` | `/recursos/{recursoId}/manutencoes` | Registra um período de manutenção |
+| `GET` | `/reservas` | Lista os veículos já reservados |
+| `GET` | `/reservas/{reservaId}` | Mostra uma reserva |
+
+### Notificações
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `GET` | `/notificacoes` | Mostra os avisos de um usuário |
+| `POST` | `/notificacoes/{notificacaoId}/leitura` | Marca um aviso como lido |
+| `GET` | `/inscricoes` | Lista as regiões de que o usuário quer receber alerta |
+| `POST` | `/inscricoes` | Inscreve o usuário para receber alertas de uma região |
+| `DELETE` | `/inscricoes/{inscricaoId}` | Cancela uma inscrição |
+
+### Análise (inteligência artificial)
+
+| Método | Caminho | Para que serve |
+|---|---|---|
+| `POST` | `/analises` | Gera um resumo explicado da situação de uma região |
+| `POST` | `/consultas` | Responde perguntas sobre prevenção usando os documentos guardados |
+| `GET` | `/documentos` | Lista os documentos que a IA consulta |
+| `POST` | `/documentos` | Adiciona um documento para a IA consultar |
+
+---
+
 ## Recursos
 
 - **Substantivos no plural**, em português e sem acento: `/regioes`, `/ocorrencias`, `/acoes`.
@@ -29,32 +176,34 @@ Os arquivos podem ser abertos no [Swagger Editor](https://editor.swagger.io). Na
 
 ## Verbos
 
-| Verbo | Uso | Idempotente |
-|---|---|---|
-| `GET` | Leitura de recurso ou coleção | Sim |
-| `POST` | Criação de recurso ou de transição de estado | Não, exceto com `Idempotency-Key` |
-| `PUT` | Substituição integral de um sub-recurso de valor único, como `/regioes/{id}/vulnerabilidade` | Sim |
-| `PATCH` | Alteração parcial de atributos cadastrais | Não garantido |
-| `DELETE` | Remoção, usada apenas em inscrições de notificação | Sim |
+| Verbo | Em palavras simples | Uso | Idempotente |
+|---|---|---|---|
+| `GET` | Consultar | Leitura de recurso ou coleção | Sim |
+| `POST` | Criar ou executar | Criação de recurso ou de transição de estado | Não, exceto com `Idempotency-Key` |
+| `PUT` | Substituir por inteiro | Substituição integral de um sub-recurso de valor único, como `/regioes/{id}/vulnerabilidade` | Sim |
+| `PATCH` | Corrigir parte | Alteração parcial de atributos cadastrais | Não garantido |
+| `DELETE` | Apagar | Remoção, usada apenas em inscrições de notificação | Sim |
+
+**Idempotente** significa que repetir o mesmo pedido várias vezes dá o mesmo resultado que fazer uma vez só.
 
 ---
 
 ## Códigos de status
 
-| Código | Quando |
-|---|---|
-| `200 OK` | Leitura bem-sucedida; transição de estado síncrona concluída |
-| `201 Created` | Recurso criado de forma síncrona. Sempre com cabeçalho `Location` |
-| `202 Accepted` | Pedido aceito para processamento assíncrono. Usado na abertura de ação preventiva, cujo resultado depende da SAGA, e em importações. Sempre com `Location` para acompanhamento |
-| `204 No Content` | Remoção bem-sucedida |
-| `400 Bad Request` | Requisição malformada: JSON inválido, tipo errado, parâmetro obrigatório ausente |
-| `401 Unauthorized` | Token ausente ou inválido. Emitido pelo gateway |
-| `403 Forbidden` | Token válido, perfil sem permissão. Emitido pelo BFF |
-| `404 Not Found` | Recurso inexistente |
-| `409 Conflict` | Transição de estado inválida para o estado atual, ou violação de unicidade |
-| `422 Unprocessable Entity` | Requisição bem formada, mas semanticamente inválida: data no passado, região inexistente |
-| `429 Too Many Requests` | Limite de requisições excedido. Emitido pelo gateway |
-| `503 Service Unavailable` | Dependência indisponível, como o provedor de LLM sem fallback |
+| Código | Em palavras simples | Quando |
+|---|---|---|
+| `200 OK` | Deu certo | Leitura bem-sucedida; transição de estado síncrona concluída |
+| `201 Created` | Criado | Recurso criado de forma síncrona. Sempre com cabeçalho `Location` |
+| `202 Accepted` | Recebido, ainda processando | Pedido aceito para processamento assíncrono. Usado na abertura de ação preventiva, cujo resultado depende da SAGA, e em importações. Sempre com `Location` para acompanhamento |
+| `204 No Content` | Apagado | Remoção bem-sucedida |
+| `400 Bad Request` | Pedido mal escrito | Requisição malformada: JSON inválido, tipo errado, parâmetro obrigatório ausente |
+| `401 Unauthorized` | Não fez login | Token ausente ou inválido. Emitido pelo gateway |
+| `403 Forbidden` | Sem permissão | Token válido, perfil sem permissão. Emitido pelo BFF |
+| `404 Not Found` | Não existe | Recurso inexistente |
+| `409 Conflict` | Não pode agora, por causa do estado atual | Transição de estado inválida para o estado atual, ou violação de unicidade |
+| `422 Unprocessable Entity` | Entendido, mas a regra não permite | Requisição bem formada, mas semanticamente inválida: data no passado, região inexistente |
+| `429 Too Many Requests` | Pedidos demais, espere um pouco | Limite de requisições excedido. Emitido pelo gateway |
+| `503 Service Unavailable` | Sistema fora do ar no momento | Dependência indisponível, como o provedor de LLM sem fallback |
 
 A distinção entre `400` e `422` é deliberada. `400` indica que o servidor não conseguiu entender a requisição; `422` indica que entendeu, mas a regra de negócio impede.
 
