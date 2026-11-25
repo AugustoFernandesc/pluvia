@@ -8,6 +8,9 @@ data:
   PORT: "3000"
   POSTGRES_HOST: equipes-db
   POSTGRES_PORT: "5432"
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_VHOST: pluvia
   POSTGRES_DB: equipes
   POSTGRES_USER: equipes
   PGDATA: /var/lib/postgresql/data/pgdata
