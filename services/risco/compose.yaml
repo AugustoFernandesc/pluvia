@@ -5,6 +5,10 @@
 #
 # Banco, usuário e senha de cada instância vêm do .env desta pasta, que o
 # Compose usa para interpolar os ${...} abaixo. Nenhuma senha fica neste arquivo.
+#
+# O Risco também fala com o RabbitMQ (outbox e projetor), pela rede
+# mensageria. Usuário e senha do broker vêm do .env desta pasta e devem ser os
+# mesmos RABBITMQ_SERVICOS_* de infra/rabbitmq/.env.
 services:
   risco:
     build: .
@@ -15,6 +19,9 @@ services:
       POSTGRES_ESCRITA_PORT: "5432"
       POSTGRES_LEITURA_HOST: risco-leitura-db
       POSTGRES_LEITURA_PORT: "5432"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_VHOST: pluvia
     depends_on:
       risco-escrita-db:
         condition: service_healthy
@@ -28,6 +35,7 @@ services:
       start_period: 20s
     networks:
       - aplicacao
+      - mensageria
       - risco-escrita-dados
       - risco-leitura-dados
 
@@ -71,5 +79,6 @@ volumes:
 
 networks:
   aplicacao:
+  mensageria:
   risco-escrita-dados:
   risco-leitura-dados:

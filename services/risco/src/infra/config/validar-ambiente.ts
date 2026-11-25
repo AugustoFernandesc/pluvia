@@ -3,6 +3,9 @@
  * (normalizada, com as regras de sinalização) e a de leitura (panorama em
  * JSONB). Cada uma tem host, banco, usuário e senha próprios, por isso as
  * variáveis levam o prefixo POSTGRES_ESCRITA_ ou POSTGRES_LEITURA_.
+ *
+ * O RabbitMQ vem em partes, e a URL amqp:// é montada no código. Assim a
+ * senha pode vir sozinha de um Secret, sem ninguém precisar montar a URL.
  */
 export interface Ambiente {
   POSTGRES_ESCRITA_HOST: string;
@@ -15,6 +18,11 @@ export interface Ambiente {
   POSTGRES_LEITURA_DB: string;
   POSTGRES_LEITURA_USER: string;
   POSTGRES_LEITURA_PASSWORD: string;
+  RABBITMQ_HOST: string;
+  RABBITMQ_PORT: number;
+  RABBITMQ_VHOST: string;
+  RABBITMQ_USER: string;
+  RABBITMQ_PASSWORD: string;
   PORT: number;
 }
 
@@ -27,11 +35,16 @@ const VARIAVEIS_TEXTO = [
   'POSTGRES_LEITURA_DB',
   'POSTGRES_LEITURA_USER',
   'POSTGRES_LEITURA_PASSWORD',
+  'RABBITMQ_HOST',
+  'RABBITMQ_VHOST',
+  'RABBITMQ_USER',
+  'RABBITMQ_PASSWORD',
 ] as const;
 
 const VARIAVEIS_PORTA = [
   'POSTGRES_ESCRITA_PORT',
   'POSTGRES_LEITURA_PORT',
+  'RABBITMQ_PORT',
   'PORT',
 ] as const;
 
@@ -46,6 +59,11 @@ const ORDEM = [
   'POSTGRES_LEITURA_DB',
   'POSTGRES_LEITURA_USER',
   'POSTGRES_LEITURA_PASSWORD',
+  'RABBITMQ_HOST',
+  'RABBITMQ_PORT',
+  'RABBITMQ_VHOST',
+  'RABBITMQ_USER',
+  'RABBITMQ_PASSWORD',
   'PORT',
 ] as const;
 
