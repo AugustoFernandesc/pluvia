@@ -1,7 +1,8 @@
-import { join } from 'path';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
 import { Ambiente } from '@infra/config/validar-ambiente';
+import { CriaRegioes1764000000000 } from '@infra/db/migrations/1764000000000-CriaRegioes';
+import { RegiaoSchema } from '@infra/db/repositories/regiao.schema';
 
 export function criarOpcoesDoBanco(
   ambiente: Pick<
@@ -21,7 +22,8 @@ export function criarOpcoesDoBanco(
     username: ambiente.POSTGRES_USER,
     password: ambiente.POSTGRES_PASSWORD,
     synchronize: false,
-    entities: [join(__dirname, '..', 'repositories', '**', '*.schema.js')],
-    migrations: [join(__dirname, '..', 'migrations', '*.js')],
+    migrationsRun: true,
+    entities: [RegiaoSchema],
+    migrations: [CriaRegioes1764000000000],
   };
 }
