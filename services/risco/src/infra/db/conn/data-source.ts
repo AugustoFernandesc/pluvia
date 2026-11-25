@@ -1,5 +1,11 @@
 import { DataSourceOptions } from 'typeorm';
 
+import { CriaSinalizacoesEOutbox1764100000000 } from '@infra/db/escrita/migrations/1764100000000-CriaSinalizacoesEOutbox';
+import { OutboxSchema } from '@infra/db/escrita/repositories/outbox.schema';
+import { SinalizacaoSchema } from '@infra/db/escrita/repositories/sinalizacao.schema';
+import { CriaPanoramas1764100000001 } from '@infra/db/leitura/migrations/1764100000001-CriaPanoramas';
+import { PanoramaSchema } from '@infra/db/leitura/repositories/panorama.schema';
+
 /**
  * Nome de cada conexão do TypeORM. É o mesmo nome usado em
  * `@InjectDataSource(...)` e como chave no corpo do `/health`.
@@ -32,8 +38,14 @@ interface ConteudoDoBanco {
  * ficavam sem tabelas.
  */
 const CONTEUDO: Record<NomeDoBanco, ConteudoDoBanco> = {
-  [BANCO_ESCRITA]: { entities: [], migrations: [] },
-  [BANCO_LEITURA]: { entities: [], migrations: [] },
+  [BANCO_ESCRITA]: {
+    entities: [SinalizacaoSchema, OutboxSchema],
+    migrations: [CriaSinalizacoesEOutbox1764100000000],
+  },
+  [BANCO_LEITURA]: {
+    entities: [PanoramaSchema],
+    migrations: [CriaPanoramas1764100000001],
+  },
 };
 
 export function criarOpcoesDoBanco(
