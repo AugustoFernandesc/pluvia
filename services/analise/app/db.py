@@ -41,6 +41,10 @@ class Banco:
     async def fechar(self) -> None:
         await self._pool.close()
 
+    def conexao(self):
+        """Conexão emprestada do pool, para usar com ``async with``."""
+        return self._pool.connection(timeout=TEMPO_LIMITE_S)
+
     async def verificar(self) -> dict[str, str]:
         """Confere que o banco responde e que a extensão vector está instalada.
 
