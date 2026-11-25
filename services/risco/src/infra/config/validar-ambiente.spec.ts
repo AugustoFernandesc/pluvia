@@ -11,6 +11,11 @@ const ambienteCompleto: Record<string, string> = {
   POSTGRES_LEITURA_DB: 'risco_leitura',
   POSTGRES_LEITURA_USER: 'risco_leitura',
   POSTGRES_LEITURA_PASSWORD: 'senha-leitura',
+  RABBITMQ_HOST: 'rabbitmq',
+  RABBITMQ_PORT: '5672',
+  RABBITMQ_VHOST: 'pluvia',
+  RABBITMQ_USER: 'pluvia-servicos',
+  RABBITMQ_PASSWORD: 'senha-rabbitmq',
   PORT: '3000',
 };
 
@@ -29,6 +34,11 @@ describe('validarAmbiente', () => {
       POSTGRES_LEITURA_DB: 'risco_leitura',
       POSTGRES_LEITURA_USER: 'risco_leitura',
       POSTGRES_LEITURA_PASSWORD: 'senha-leitura',
+      RABBITMQ_HOST: 'rabbitmq',
+      RABBITMQ_PORT: 5672,
+      RABBITMQ_VHOST: 'pluvia',
+      RABBITMQ_USER: 'pluvia-servicos',
+      RABBITMQ_PASSWORD: 'senha-rabbitmq',
       PORT: 3000,
     });
   });
@@ -50,11 +60,11 @@ describe('validarAmbiente', () => {
 
   it('nomeia todas as variáveis ausentes de uma vez, escrita antes de leitura', () => {
     expect(() => validarAmbiente({})).toThrow(
-      /POSTGRES_ESCRITA_HOST.*POSTGRES_ESCRITA_PASSWORD.*POSTGRES_LEITURA_HOST.*POSTGRES_LEITURA_PASSWORD.*PORT/s,
+      /POSTGRES_ESCRITA_HOST.*POSTGRES_ESCRITA_PASSWORD.*POSTGRES_LEITURA_HOST.*POSTGRES_LEITURA_PASSWORD.*RABBITMQ_HOST.*RABBITMQ_PASSWORD.*PORT/s,
     );
   });
 
-  it.each(['POSTGRES_ESCRITA_PORT', 'POSTGRES_LEITURA_PORT', 'PORT'])(
+  it.each(['POSTGRES_ESCRITA_PORT', 'POSTGRES_LEITURA_PORT', 'RABBITMQ_PORT', 'PORT'])(
     'rejeita %s não numérico',
     (variavel) => {
       expect(() =>

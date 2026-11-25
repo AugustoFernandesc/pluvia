@@ -14,4 +14,7 @@ data:
   POSTGRES_LEITURA_PORT: "5432"
   POSTGRES_LEITURA_DB: risco_leitura
   POSTGRES_LEITURA_USER: risco_leitura
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_VHOST: pluvia
   PGDATA: /var/lib/postgresql/data/pgdata
