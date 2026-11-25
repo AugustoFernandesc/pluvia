@@ -43,6 +43,12 @@ describe('GET /health (e2e)', () => {
     process.env.POSTGRES_USER = banco.getUsername();
     process.env.POSTGRES_PASSWORD = banco.getPassword();
     process.env.PORT = '3000';
+    // Sem broker neste teste: os consumidores ficam tentando reconectar.
+    process.env.RABBITMQ_HOST = '127.0.0.1';
+    process.env.RABBITMQ_PORT = '1';
+    process.env.RABBITMQ_VHOST = 'pluvia';
+    process.env.RABBITMQ_USER = 'teste';
+    process.env.RABBITMQ_PASSWORD = 'teste';
 
     // O ConfigModule valida o ambiente ao carregar o módulo, então o AppModule
     // só pode ser importado depois de as variáveis estarem definidas.
