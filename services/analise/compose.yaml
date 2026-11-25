@@ -1,7 +1,9 @@
 services:
   analise:
     build: .
-    env_file: .env
+    env_file:
+      - .env
+      - llm.env
     environment:
       PORT: "8000"
       POSTGRES_HOST: analise-db
@@ -9,6 +11,10 @@ services:
     depends_on:
       analise-db:
         condition: service_healthy
+      # A Análise sobe sem esperar os modelos: enquanto eles baixam, as consultas
+      # caem no fallback e a base de conhecimento é indexada assim que der.
+      ollama:
+        condition: service_started
     healthcheck:
       # A imagem python:slim não tem wget nem curl. O urlopen falha com 503,
       # então o healthcheck só passa com o banco de pé e o pgvector instalado.
@@ -20,6 +26,7 @@ services:
     networks:
       - aplicacao
       - analise-dados
+      - llm
 
   analise-db:
     image: pgvector/pgvector:pg17
@@ -42,3 +49,4 @@ volumes:
 networks:
   aplicacao:
   analise-dados:
+  llm:

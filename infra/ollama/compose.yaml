@@ -1,0 +1,34 @@
+services:
+  ollama:
+    image: ollama/ollama:0.40.15
+    volumes:
+      - ollama-modelos:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - llm
+
+  # Baixa os modelos para o volume na primeira subida e termina. Nas seguintes,
+  # o pull só confere que estão atualizados. Os nomes vêm de services/analise/llm.env.
+  ollama-modelos:
+    image: ollama/ollama:0.40.15
+    env_file: ../../services/analise/llm.env
+    environment:
+      OLLAMA_HOST: ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull \"$$LLM_MODELO\" && ollama pull \"$$EMBEDDING_MODELO\""]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - llm
+
+volumes:
+  ollama-modelos:
+
+networks:
+  llm:
