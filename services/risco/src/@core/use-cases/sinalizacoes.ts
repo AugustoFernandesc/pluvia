@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { criarEnvelope } from '@domain/evento';
 import {
+  FiltroSinalizacoes,
+  Pagina,
   REPOSITORIO_SINALIZACOES,
   RepositorioSinalizacoes,
   Sinalizacao,
@@ -47,5 +49,36 @@ export class ReconhecerSinalizacao {
     });
     if (!resultado) throw new SinalizacaoNaoEncontrada(comando.sinalizacaoId);
     return resultado;
+  }
+}
+
+/**
+ * Consultas de sinalizações. Leem do modelo de ESCRITA, e não do de leitura,
+ * porque o técnico que acabou de reconhecer precisa ver o estado novo na
+ * hora, sem esperar a projeção (07-cqrs.md).
+ */
+@Injectable()
+export class ListarSinalizacoes {
+  constructor(
+    @Inject(REPOSITORIO_SINALIZACOES)
+    private readonly sinalizacoes: RepositorioSinalizacoes,
+  ) {}
+
+  executar(filtro: FiltroSinalizacoes): Promise<Pagina<Sinalizacao>> {
+    return this.sinalizacoes.listar(filtro);
+  }
+}
+
+@Injectable()
+export class ObterSinalizacao {
+  constructor(
+    @Inject(REPOSITORIO_SINALIZACOES)
+    private readonly sinalizacoes: RepositorioSinalizacoes,
+  ) {}
+
+  async executar(id: string): Promise<Sinalizacao> {
+    const sinalizacao = await this.sinalizacoes.obter(id);
+    if (!sinalizacao) throw new SinalizacaoNaoEncontrada(id);
+    return sinalizacao;
   }
 }

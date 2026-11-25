@@ -82,3 +82,32 @@ export interface RepositorioPanoramas {
 }
 
 export const REPOSITORIO_PANORAMAS = Symbol('RepositorioPanoramas');
+
+export interface ResumoPanorama {
+  regiaoId: string;
+  regiaoNome: string;
+  municipio: string;
+  nivelAtencao: NivelAtencao;
+  sinalizacoesAbertas: number;
+  atualizadoEm: Date;
+  versao: number;
+}
+
+export type PanoramaCompleto = ResumoPanorama & DocumentoPanorama;
+
+export function resumir(p: Panorama): ResumoPanorama {
+  return {
+    regiaoId: p.regiaoId,
+    regiaoNome: p.regiaoNome,
+    municipio: p.municipio,
+    nivelAtencao: p.nivelAtencao,
+    sinalizacoesAbertas: contarAbertas(p.documento),
+    atualizadoEm: p.atualizadoEm,
+    versao: p.versao,
+  };
+}
+
+/** O documento pronto, com as colunas da linha por cima. Nada é calculado na leitura além da contagem. */
+export function detalhar(p: Panorama): PanoramaCompleto {
+  return { ...p.documento, ...resumir(p) };
+}
