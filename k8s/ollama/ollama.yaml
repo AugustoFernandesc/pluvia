@@ -26,6 +26,15 @@ spec:
           envFrom:
             - configMapRef:
                 name: analise-config
+          env:
+            - name: OLLAMA_CONTEXT_LENGTH
+              value: "4096"
+            - name: OLLAMA_FLASH_ATTENTION
+              value: "1"
+            - name: OLLAMA_KV_CACHE_TYPE
+              value: q8_0
+            - name: OLLAMA_MAX_LOADED_MODELS
+              value: "2"
           lifecycle:
             postStart:
               exec:
@@ -49,7 +58,7 @@ spec:
               memory: 3Gi
             limits:
               cpu: "4"
-              memory: 6Gi
+              memory: 5Gi
           volumeMounts:
             - name: modelos
               mountPath: /root/.ollama

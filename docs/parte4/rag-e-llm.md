@@ -99,7 +99,30 @@ O gargalo é **ler o contexto na CPU**: os 4 trechos quase triplicam a entrada. 
 - **Menos trechos ou trechos menores:** com `RAG_TRECHOS=2`, a entrada cai pela metade, mas o risco de perder o trecho certo aumenta.
 - **Cache:** perguntas repetidas, frequentes num painel, custam zero.
 
-O modelo ocupa cerca de **6,8 GB de RAM** com os dois modelos carregados. A máquina da apresentação precisa de pelo menos 12 GB livres para o Docker.
+### Memória
+
+Sem ajuste, o Ollama reserva memória para um contexto muito maior do que o RAG usa. Com as configurações abaixo (`infra/ollama/compose.yaml`), a memória cai sem mudar as respostas: a avaliação repetida deu os mesmos **10/11 fatos**.
+
+| Configuração | Efeito |
+|---|---|
+| Pesos em **Q4** (padrão do `qwen2.5:3b` no Ollama) | O modelo ocupa 2,1 GB em vez de ~6 GB em 16 bits |
+| `OLLAMA_CONTEXT_LENGTH=4096` | Contexto de 4.096 tokens. O prompt do RAG usa ~900 |
+| `OLLAMA_KV_CACHE_TYPE=q8_0` com `OLLAMA_FLASH_ATTENTION=1` | Cache de contexto quantizado em 8 bits: metade da memória do cache |
+| `OLLAMA_MAX_LOADED_MODELS=2` | Os dois modelos ficam carregados juntos |
+
+| Medição | Antes | Depois |
+|---|---|---|
+| Pico de memória do container do Ollama (`docker stats`, inclui cache de arquivos do sistema) | 6,8 GB | **3,7 GB** |
+| Modelos carregados (`ollama ps`) | — | `qwen2.5:3b` 2,1 GB + `bge-m3` 1,2 GB |
+
+**Teste descartado:** carregar um modelo por vez (`OLLAMA_MAX_LOADED_MODELS=1`) quase não economizou memória e acrescentou ~1,5 s a cada pergunta, porque o Ollama descarrega um modelo e carrega o outro entre a busca e a geração.
+
+**Máquina da apresentação:** o sistema inteiro usa ~3,5 GB e o Ollama ~3,7 GB. Num notebook de 16 GB, o Docker no Windows só pode usar metade da RAM por padrão. Para liberar 10 GB, crie `C:\Users\<usuario>\.wslconfig` com:
+
+```
+[wsl2]
+memory=10GB
+```
 
 ---
 
