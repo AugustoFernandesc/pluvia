@@ -1,3 +1,5 @@
+import { EventoParaPublicar } from './evento';
+
 export type NivelAtencao = 'NORMAL' | 'OBSERVACAO' | 'ATENCAO' | 'ALTA_ATENCAO';
 
 /** Do mais grave para o mais leve. É a ordem do painel. */
@@ -62,3 +64,32 @@ export function reconhecer(
   }
   return { ...sinalizacao, estado: 'RECONHECIDA', reconhecidaEm: agora, reconhecidaPor };
 }
+
+export interface FiltroSinalizacoes {
+  estado?: EstadoSinalizacao;
+  regiaoId?: string;
+  origem?: OrigemSinalizacao;
+  pagina: number;
+  tamanho: number;
+}
+
+/** O que uma mudança devolve: o novo estado e os eventos que ela gera. */
+export interface ResultadoDaMudanca {
+  sinalizacao: Sinalizacao;
+  eventos: EventoParaPublicar[];
+}
+
+export interface RepositorioSinalizacoes {
+  listar(filtro: FiltroSinalizacoes): Promise<Pagina<Sinalizacao>>;
+  obter(id: string): Promise<Sinalizacao | null>;
+  /**
+   * Carrega a sinalização com lock, aplica a mudança e grava o novo estado e
+   * os eventos na outbox, tudo na mesma transação. Devolve null se não existir.
+   */
+  alterar(
+    id: string,
+    mudanca: (atual: Sinalizacao) => ResultadoDaMudanca,
+  ): Promise<Sinalizacao | null>;
+}
+
+export const REPOSITORIO_SINALIZACOES = Symbol('RepositorioSinalizacoes');
