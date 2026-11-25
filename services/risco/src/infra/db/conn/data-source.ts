@@ -1,4 +1,3 @@
-import { join } from 'path';
 import { DataSourceOptions } from 'typeorm';
 
 /**
@@ -18,22 +17,36 @@ export interface ConexaoDoBanco {
   password: string;
 }
 
+interface ConteudoDoBanco {
+  entities: NonNullable<DataSourceOptions['entities']>;
+  migrations: NonNullable<DataSourceOptions['migrations']>;
+}
+
 /**
- * Cada banco tem as próprias entidades e migrations, em
+ * Cada banco tem a própria lista de entidades e de migrations, em
  * `infra/db/escrita` e `infra/db/leitura`. Uma entidade do modelo de escrita
  * nunca é carregada na conexão de leitura, e vice-versa.
+ *
+ * As listas são explícitas, e não um glob de `*.js`, como no Território:
+ * o glob não acha nada quando o código roda pelo ts-jest, e os testes
+ * ficavam sem tabelas.
  */
+const CONTEUDO: Record<NomeDoBanco, ConteudoDoBanco> = {
+  [BANCO_ESCRITA]: { entities: [], migrations: [] },
+  [BANCO_LEITURA]: { entities: [], migrations: [] },
+};
+
 export function criarOpcoesDoBanco(
   nome: NomeDoBanco,
   conexao: ConexaoDoBanco,
 ): DataSourceOptions {
-  const pasta = join(__dirname, '..', nome);
   return {
     type: 'postgres',
     name: nome,
     ...conexao,
     synchronize: false,
-    entities: [join(pasta, 'repositories', '**', '*.schema.js')],
-    migrations: [join(pasta, 'migrations', '*.js')],
+    migrationsRun: true,
+    entities: CONTEUDO[nome].entities,
+    migrations: CONTEUDO[nome].migrations,
   };
 }
