@@ -11,3 +11,16 @@ data:
   POSTGRES_DB: analise
   POSTGRES_USER: analise
   PGDATA: /var/lib/postgresql/data/pgdata
+  OLLAMA_URL: "http://ollama:11434"
+  LLM_MODELO: "qwen2.5:3b"
+  LLM_TEMPERATURA: "0.1"
+  LLM_TIMEOUT_S: "60"
+  LLM_TENTATIVAS: "3"
+  EMBEDDING_MODELO: "bge-m3"
+  EMBEDDING_DIMENSAO: "1024"
+  CIRCUITO_FALHAS: "3"
+  CIRCUITO_ESPERA_S: "30"
+  CACHE_TTL_S: "600"
+  CACHE_TAMANHO: "256"
+  RAG_TRECHOS: "4"
+  BASE_CONHECIMENTO_DIR: "/app/conhecimento"
