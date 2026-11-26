@@ -159,6 +159,7 @@ jobs:
         run: |
           compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
           "${compose[@]}" stop territorio
+          "${compose[@]}" rm --force territorio
           python scripts/ci_integration.py \
             --secret-env-file infra/keycloak/.env \
             --keycloak-url http://127.0.0.1:18080 \
@@ -301,7 +302,8 @@ jobs:
             --keycloak-url http://127.0.0.1:18081 \
             --gateway-url http://127.0.0.1:18080 \
             --host-header pluvia.local \
-            --issuer http://pluvia.local/auth/realms/pluvia
+            --issuer http://pluvia.local/auth/realms/pluvia \
+            --skip-domain-integration
       - name: Diagnosticar falha Kubernetes, Kind ou Traefik
         if: failure()
         run: |

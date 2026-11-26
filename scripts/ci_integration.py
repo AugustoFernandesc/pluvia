@@ -310,117 +310,118 @@ def run(args) -> None:
     if public_response.get("access") != "public":
         raise AssertionError("A rota pública Mobile não respondeu pelo BFF esperado.")
 
-    # Traverse both public clients' API paths through Kong to the real domain services.
-    regiao_id = "6f1c2a10-0000-4000-8000-000000000001"
-    assert_status(
-        gateway_request(f"/web/v1/regioes/{regiao_id}")[0],
-        401,
-        "região Web sem JWT",
-    )
-    assert_status(
-        gateway_request(f"/web/v1/regioes/{regiao_id}", tokens["AGENTE_1"])[0],
-        403,
-        "região Web com papel AGENTE",
-    )
-    status, detalhe_web, _ = gateway_request(
-        f"/web/v1/regioes/{regiao_id}", tokens["GESTOR"]
-    )
-    assert_status(status, 200, "região Centro pelo BFF Web")
-    if (
-        detalhe_web.get("regiao", {}).get("id") != regiao_id
-        or detalhe_web.get("regiao", {}).get("nome") != "Centro"
-        or detalhe_web.get("panorama", {}).get("regiaoId") != regiao_id
-        or detalhe_web.get("panorama", {}).get("nivelAtencao") != "ATENCAO"
-        or not isinstance(detalhe_web.get("analise", {}).get("sintese"), str)
-        or not detalhe_web.get("analise", {}).get("fontes")
-    ):
-        raise AssertionError("BFF Web não compôs os dados reais de Centro, Risco e Análise.")
-
-    status, regioes_mobile, _ = gateway_request(
-        "/mobile/v1/publico/regioes?municipio=Lavras"
-    )
-    assert_status(status, 200, "lista pública de regiões pelo BFF Mobile")
-    if not any(item.get("id") == regiao_id and item.get("nome") == "Centro" for item in regioes_mobile.get("itens", [])):
-        raise AssertionError("A lista Mobile não contém a região Centro devolvida por Território.")
-
-    status, resumo_mobile, _ = gateway_request(
-        f"/mobile/v1/publico/regioes/{regiao_id}/resumo"
-    )
-    assert_status(status, 200, "resumo público Mobile da região Centro")
-    if (
-        resumo_mobile.get("regiao") != detalhe_web["regiao"]["nome"]
-        or resumo_mobile.get("nivel") != detalhe_web["panorama"]["nivelAtencao"]
-        or resumo_mobile.get("atualizadoEm") != detalhe_web["panorama"]["atualizadoEm"]
-    ):
-        raise AssertionError("Os clientes Web e Mobile não refletem o mesmo panorama de origem.")
-
-    pedido_acao = {
-        "regiaoId": regiao_id,
-        "tipo": "LIMPEZA_DRENAGEM",
-        "data": (datetime.now(ZoneInfo("America/Sao_Paulo")).date() + timedelta(days=1)).isoformat(),
-        "turno": "MANHA",
-        "especialidade": "DRENAGEM",
-        "categoriaRecurso": "CAMINHAO_HIDROJATO",
-    }
-    assert_status(
-        gateway_request("/web/v1/acoes", tokens["AGENTE_1"], method="POST", data=pedido_acao)[0],
-        403,
-        "criação de ação pelo perfil AGENTE",
-    )
-    status, acao, cabecalhos_acao = gateway_request(
-        "/web/v1/acoes",
-        tokens["GESTOR"],
-        method="POST",
-        data=pedido_acao,
-        extra_headers={"Idempotency-Key": f"ci-pluvia-{int(time.time())}"},
-    )
-    assert_status(status, 202, "solicitação real de ação preventiva pelo BFF Web")
-    acao_id = acao.get("id") if isinstance(acao, dict) else None
-    if not acao_id or cabecalhos_acao.get("Location") != f"/web/v1/acoes/{acao_id}":
-        raise AssertionError("Operações não devolveu a ação e Location público esperados.")
-    if acao.get("_links", {}).get("self", {}).get("href") != f"/web/v1/acoes/{acao_id}":
-        raise AssertionError("BFF Web não reescreveu o link HATEOAS da ação.")
-
-    saga = None
-    acao_atual = acao
-    for _ in range(40):
-        saga_status, saga, _ = gateway_request(
-            f"/web/v1/acoes/{acao_id}/saga", tokens["GESTOR"]
+    if not args.skip_domain_integration:
+        # Traverse both public clients' API paths through Kong to the real domain services.
+        regiao_id = "6f1c2a10-0000-4000-8000-000000000001"
+        assert_status(
+            gateway_request(f"/web/v1/regioes/{regiao_id}")[0],
+            401,
+            "região Web sem JWT",
         )
-        action_status, acao_atual, _ = gateway_request(
-            f"/web/v1/acoes/{acao_id}", tokens["GESTOR"]
+        assert_status(
+            gateway_request(f"/web/v1/regioes/{regiao_id}", tokens["AGENTE_1"])[0],
+            403,
+            "região Web com papel AGENTE",
         )
-        if saga_status == 200 and action_status == 200 and saga.get("estado") in {"CONCLUIDA", "COMPENSADA"}:
-            break
-        time.sleep(1)
-    if (
-        not isinstance(saga, dict)
-        or saga.get("estado") != "CONCLUIDA"
-        or not isinstance(saga.get("passos"), list)
-        or len(saga["passos"]) < 4
-        or not isinstance(acao_atual, dict)
-        or acao_atual.get("estado") != "CONFIRMADA"
-    ):
-        raise AssertionError("A SAGA real não concluiu a ação ou não publicou as quatro etapas esperadas.")
-    print("Ação preventiva percorreu Operações → Equipes → Frota e a SAGA terminou com estado e etapas reais.")
+        status, detalhe_web, _ = gateway_request(
+            f"/web/v1/regioes/{regiao_id}", tokens["GESTOR"]
+        )
+        assert_status(status, 200, "região Centro pelo BFF Web")
+        if (
+            detalhe_web.get("regiao", {}).get("id") != regiao_id
+            or detalhe_web.get("regiao", {}).get("nome") != "Centro"
+            or detalhe_web.get("panorama", {}).get("regiaoId") != regiao_id
+            or detalhe_web.get("panorama", {}).get("nivelAtencao") != "ATENCAO"
+            or not isinstance(detalhe_web.get("analise", {}).get("sintese"), str)
+            or not detalhe_web.get("analise", {}).get("fontes")
+        ):
+            raise AssertionError("BFF Web não compôs os dados reais de Centro, Risco e Análise.")
 
-    status, analise_problema, analise_headers = gateway_request(
-        "/web/v1/consultas",
-        tokens["TECNICO"],
-        method="POST",
-        data={
-            "pergunta": "Quais cuidados devem ser avaliados antes de uma chuva intensa?",
-            "usarRecuperacao": False,
-        },
-    )
-    assert_status(status, 503, "Análise sem modelo de linguagem disponível no CI")
-    if (
-        not str(analise_headers.get("Content-Type", "")).startswith("application/problem+json")
-        or not isinstance(analise_problema, dict)
-        or analise_problema.get("status") != 503
-    ):
-        raise AssertionError("BFF Web não preservou o problema 503 emitido por Análise.")
-    print("Consulta chegou ao serviço Análise real; sem Ollama no runner, o BFF preservou o 503 problem+json.")
+        status, regioes_mobile, _ = gateway_request(
+            "/mobile/v1/publico/regioes?municipio=Lavras"
+        )
+        assert_status(status, 200, "lista pública de regiões pelo BFF Mobile")
+        if not any(item.get("id") == regiao_id and item.get("nome") == "Centro" for item in regioes_mobile.get("itens", [])):
+            raise AssertionError("A lista Mobile não contém a região Centro devolvida por Território.")
+
+        status, resumo_mobile, _ = gateway_request(
+            f"/mobile/v1/publico/regioes/{regiao_id}/resumo"
+        )
+        assert_status(status, 200, "resumo público Mobile da região Centro")
+        if (
+            resumo_mobile.get("regiao") != detalhe_web["regiao"]["nome"]
+            or resumo_mobile.get("nivel") != detalhe_web["panorama"]["nivelAtencao"]
+            or resumo_mobile.get("atualizadoEm") != detalhe_web["panorama"]["atualizadoEm"]
+        ):
+            raise AssertionError("Os clientes Web e Mobile não refletem o mesmo panorama de origem.")
+
+        pedido_acao = {
+            "regiaoId": regiao_id,
+            "tipo": "LIMPEZA_DRENAGEM",
+            "data": (datetime.now(ZoneInfo("America/Sao_Paulo")).date() + timedelta(days=1)).isoformat(),
+            "turno": "MANHA",
+            "especialidade": "DRENAGEM",
+            "categoriaRecurso": "CAMINHAO_HIDROJATO",
+        }
+        assert_status(
+            gateway_request("/web/v1/acoes", tokens["AGENTE_1"], method="POST", data=pedido_acao)[0],
+            403,
+            "criação de ação pelo perfil AGENTE",
+        )
+        status, acao, cabecalhos_acao = gateway_request(
+            "/web/v1/acoes",
+            tokens["GESTOR"],
+            method="POST",
+            data=pedido_acao,
+            extra_headers={"Idempotency-Key": f"ci-pluvia-{int(time.time())}"},
+        )
+        assert_status(status, 202, "solicitação real de ação preventiva pelo BFF Web")
+        acao_id = acao.get("id") if isinstance(acao, dict) else None
+        if not acao_id or cabecalhos_acao.get("Location") != f"/web/v1/acoes/{acao_id}":
+            raise AssertionError("Operações não devolveu a ação e Location público esperados.")
+        if acao.get("_links", {}).get("self", {}).get("href") != f"/web/v1/acoes/{acao_id}":
+            raise AssertionError("BFF Web não reescreveu o link HATEOAS da ação.")
+
+        saga = None
+        acao_atual = acao
+        for _ in range(40):
+            saga_status, saga, _ = gateway_request(
+                f"/web/v1/acoes/{acao_id}/saga", tokens["GESTOR"]
+            )
+            action_status, acao_atual, _ = gateway_request(
+                f"/web/v1/acoes/{acao_id}", tokens["GESTOR"]
+            )
+            if saga_status == 200 and action_status == 200 and saga.get("estado") in {"CONCLUIDA", "COMPENSADA"}:
+                break
+            time.sleep(1)
+        if (
+            not isinstance(saga, dict)
+            or saga.get("estado") != "CONCLUIDA"
+            or not isinstance(saga.get("passos"), list)
+            or len(saga["passos"]) < 4
+            or not isinstance(acao_atual, dict)
+            or acao_atual.get("estado") != "CONFIRMADA"
+        ):
+            raise AssertionError("A SAGA real não concluiu a ação ou não publicou as quatro etapas esperadas.")
+        print("Ação preventiva percorreu Operações → Equipes → Frota e a SAGA terminou com estado e etapas reais.")
+
+        status, analise_problema, analise_headers = gateway_request(
+            "/web/v1/consultas",
+            tokens["TECNICO"],
+            method="POST",
+            data={
+                "pergunta": "Quais cuidados devem ser avaliados antes de uma chuva intensa?",
+                "usarRecuperacao": False,
+            },
+        )
+        assert_status(status, 503, "Análise sem modelo de linguagem disponível no CI")
+        if (
+            not str(analise_headers.get("Content-Type", "")).startswith("application/problem+json")
+            or not isinstance(analise_problema, dict)
+            or analise_problema.get("status") != 503
+        ):
+            raise AssertionError("BFF Web não preservou o problema 503 emitido por Análise.")
+        print("Consulta chegou ao serviço Análise real; sem Ollama no runner, o BFF preservou o 503 problem+json.")
     assert_status(
         gateway_request("/mobile/v1/_system/authorization-check")[0],
         401,
@@ -491,6 +492,11 @@ def main() -> None:
     parser.add_argument("--gateway-url", required=True)
     parser.add_argument("--issuer", required=True)
     parser.add_argument("--host-header", default="")
+    parser.add_argument(
+        "--skip-domain-integration",
+        action="store_true",
+        help="Run gateway authentication checks without domain services.",
+    )
     parser.add_argument(
         "--check-mobile-unavailable",
         action="store_true",
