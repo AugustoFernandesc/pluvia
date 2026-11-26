@@ -13,6 +13,12 @@ interface PanoramaResumo {
   atualizadoEm: string;
 }
 
+interface RegiaoTerritorio {
+  id: string;
+  codigo?: string;
+  geometria?: unknown;
+}
+
 interface PaginaPanoramas {
   itens: PanoramaResumo[];
 }
@@ -27,9 +33,13 @@ export class PainelController {
     const query = new URLSearchParams({ pagina: '1', tamanho: '100' });
     const municipio = typeof request.query.municipio === 'string' ? request.query.municipio : undefined;
     if (municipio) query.set('municipio', municipio);
-    const [risco, operacoes] = await Promise.all([
+    const queryRegioes = new URLSearchParams();
+    if (municipio) queryRegioes.set('municipio', municipio);
+    queryRegioes.set('tamanho', '100');
+    const [risco, operacoes, territorio] = await Promise.all([
       this.servicos.requisitar('RISCO', `v1/panoramas?${query.toString()}`, request, { preservarQuery: false }),
       this.servicos.requisitar('OPERACOES', 'v1/acoes?tamanho=100', request, { preservarQuery: false }),
+      this.servicos.requisitar('TERRITORIO', `v1/regioes?${queryRegioes.toString()}`, request, { preservarQuery: false }),
     ]);
     if (risco.status < 200 || risco.status >= 300) {
       return enviarRespostaInterna(response, risco, risco.body, request.header('x-request-id'));
@@ -69,6 +79,9 @@ export class PainelController {
     const acoesDisponiveis = operacoes.status >= 200 && operacoes.status < 300 && acoes.completas;
     if (!acoesDisponiveis) avisos.push('Operações ainda não disponibiliza uma lista completa de ações.');
 
+    const territorioPorId = this.indexarRegioes(territorio);
+    if (!territorioPorId) avisos.push('Território não disponibilizou a geometria das regiões.');
+
     const atualizadoEm = pagina.itens
       .map((item) => item.atualizadoEm)
       .filter((valor): valor is string => typeof valor === 'string')
@@ -80,6 +93,8 @@ export class PainelController {
       regioes: pagina.itens.map((item) => ({
         regiaoId: item.regiaoId,
         nome: item.regiaoNome,
+        codigo: territorioPorId?.get(item.regiaoId)?.codigo ?? null,
+        geometria: territorioPorId?.get(item.regiaoId)?.geometria ?? null,
         nivelAtencao: item.nivelAtencao,
         sinalizacoesAbertas: item.sinalizacoesAbertas,
         acoesAbertas: acoesDisponiveis ? acoesPorRegiao.get(item.regiaoId) ?? 0 : null,
@@ -95,6 +110,13 @@ export class PainelController {
       atualizadoEm,
       avisos,
     });
+  }
+
+  private indexarRegioes(resposta: RespostaInterna): Map<string, RegiaoTerritorio> | null {
+    if (resposta.status < 200 || resposta.status >= 300) return null;
+    const pagina = jsonInterno<{ itens?: RegiaoTerritorio[] }>(resposta);
+    if (!pagina || !Array.isArray(pagina.itens)) return null;
+    return new Map(pagina.itens.map((regiao) => [regiao.id, regiao]));
   }
 
   private listarAcoes(resposta: RespostaInterna): { itens: Record<string, unknown>[]; completas: boolean } {

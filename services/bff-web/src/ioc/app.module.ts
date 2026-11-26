@@ -11,6 +11,7 @@ import { AcoesController } from '@app/acoes/acoes.controller';
 import { ConsultasController } from '@app/consultas/consultas.controller';
 import { ClienteServicosService } from '@app/integracao/cliente-servicos.service';
 import { PainelController } from '@app/painel/painel.controller';
+import { PanoramasController } from '@app/panoramas/panoramas.controller';
 import { RegioesController } from '@app/regioes/regioes.controller';
 import { SinalizacoesController } from '@app/sinalizacoes/sinalizacoes.controller';
 
@@ -24,6 +25,7 @@ import { GlobalModule } from './global.module';
     RegioesController,
     AcoesController,
     PainelController,
+    PanoramasController,
     SinalizacoesController,
     ConsultasController,
   ],
