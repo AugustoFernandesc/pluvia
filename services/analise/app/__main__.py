@@ -42,7 +42,9 @@ def main() -> None:
         consultas=ServicoConsultas(llm, recuperador, config.CACHE_TTL_S, config.CACHE_TAMANHO),
         repositorio=repositorio,
         ingestor=Ingestor(repositorio, llm),
-        analises=ServicoAnalises(llm, FontesPluvia(fontes)),
+        analises=ServicoAnalises(
+            llm, FontesPluvia(fontes), config.CACHE_TTL_S, config.CACHE_TAMANHO
+        ),
     )
     app = criar_app(banco, servicos, Path(config.BASE_CONHECIMENTO_DIR))
     uvicorn.run(app, host="0.0.0.0", port=ambiente.PORT)

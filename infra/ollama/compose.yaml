@@ -9,6 +9,9 @@ services:
       OLLAMA_FLASH_ATTENTION: "1"
       OLLAMA_KV_CACHE_TYPE: q8_0
       OLLAMA_MAX_LOADED_MODELS: "2"
+      # Mantém os modelos carregados: sem isso, saem da memória depois de 5 min
+      # parados e a pergunta seguinte paga a recarga.
+      OLLAMA_KEEP_ALIVE: "-1"
     volumes:
       - ollama-modelos:/root/.ollama
     healthcheck:

@@ -2,6 +2,7 @@
 """Static consistency checks for Compose, Kong, BFF and Kubernetes files."""
 
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -69,6 +70,7 @@ def validate_kong() -> None:
         "bff-web": "http://bff-web:3000",
         "bff-mobile": "http://bff-mobile:3000",
         "keycloak": "http://keycloak:8080",
+        "keycloak-recursos": "http://keycloak:8080/resources",
     }:
         fail("Kong deve encaminhar apenas para os dois BFFs e o Keycloak.")
 
@@ -258,6 +260,14 @@ def validate_clients() -> None:
     ):
         fail("Keycloak deve permitir o cliente Web público com redirect local e PKCE S256.")
 
+    # Every local file the page loads must be copied into the Nginx image.
+    for client in (web, mobile):
+        page = (client / "index.html").read_text(encoding="utf-8")
+        copied = (client / "Dockerfile").read_text(encoding="utf-8")
+        for asset in re.findall(r'(?:href|src)="/([\w.-]+\.(?:css|js))"', page):
+            if asset not in copied:
+                fail(f"{client.name}/Dockerfile não copia {asset}, carregado pelo index.html.")
+
     web_script = (web / "app.js").read_text(encoding="utf-8")
     web_html = (web / "index.html").read_text(encoding="utf-8")
     mobile_script = (mobile / "app.js").read_text(encoding="utf-8")
@@ -354,6 +364,20 @@ def validate_kubernetes() -> None:
                     f"Keycloak client {client.get('clientId')} referencia scopes não declarados: "
                     f"{', '.join(sorted(missing_scopes))}."
                 )
+        # Keycloak 25+ only emits the sub claim through the basic scope; the BFFs
+        # reject tokens without sub.
+        basic_has_sub = any(
+            mapper.get("protocolMapper") == "oidc-sub-mapper"
+            and mapper.get("config", {}).get("access.token.claim") == "true"
+            for mapper in client_scopes.get("basic", {}).get("protocolMappers", [])
+        )
+        if not basic_has_sub:
+            fail("Keycloak precisa declarar o scope basic com o mapper de sub no access token.")
+        for client in realm_config.get("clients", []):
+            if client.get("clientId") in {"pluvia-web", "pluvia-mobile"} and "basic" not in client.get(
+                "defaultClientScopes", []
+            ):
+                fail(f"O cliente {client.get('clientId')} precisa do scope basic para receber o sub.")
         roles_scope = client_scopes.get("roles", {})
         realm_roles_mapper = any(
             mapper.get("protocolMapper") == "oidc-usermodel-realm-role-mapper"

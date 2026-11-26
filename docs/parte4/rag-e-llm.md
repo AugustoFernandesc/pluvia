@@ -19,7 +19,7 @@ flowchart LR
     T -->|bge-m3| E[Embeddings]
     E --> V[(pgvector)]
     P[Pergunta] -->|bge-m3| Q[Embedding da pergunta]
-    Q -->|4 trechos mais próximos| V
+    Q -->|3 trechos mais próximos| V
     V --> C["Chain LangChain:<br/>prompt | qwen2.5:3b | parser"]
     P --> C
     C --> R[Resposta com os títulos usados]
@@ -28,7 +28,7 @@ flowchart LR
 1. **Ingestão:** na subida, o serviço indexa a pasta `conhecimento/`. Um documento já indexado com o mesmo conteúdo (hash SHA-256) é ignorado. `POST /v1/documentos` indexa um texto a partir de uma URL.
 2. **Embeddings:** feitos pelo `OllamaEmbeddings` do LangChain.
 3. **Armazenamento:** a tabela `trechos` tem a coluna `embedding vector(1024)` e o índice HNSW.
-4. **Recuperação:** a classe `RecuperadorPluvia` é um `BaseRetriever` do LangChain e devolve os 4 trechos mais próximos pela distância de cosseno.
+4. **Recuperação:** a classe `RecuperadorPluvia` é um `BaseRetriever` do LangChain e devolve os 3 trechos mais próximos (`RAG_TRECHOS`) pela distância de cosseno.
 5. **Geração:** a chain `PROMPT_COM_RECUPERACAO | modelo | StrOutputParser` gera a resposta. O prompt manda responder **só com o contexto** e dizer quando a base não cobre o assunto.
 
 ---
@@ -69,6 +69,8 @@ O enunciado pede pelo menos 2 mecanismos. **Os 4 estão implementados** e foram 
 | **Cache** | Por chave (modelo, modo e pergunta normalizada), TTL de 10 min, 256 entradas | A mesma pergunta respondeu em **0 ms** com `origem: CACHE`, contra 17 s gerando |
 | **Fallback** | Sem o modelo, a resposta traz os trechos mais relevantes com `origem: FALLBACK`. Se o modelo de embeddings também cair, a busca passa a ser por palavras-chave no PostgreSQL (`buscaDegradada: true`) | Com o Ollama parado, 4 de 4 perguntas responderam com os trechos certos |
 
+**Síntese da região:** também fica em cache, com chave pelos dados atuais de Território e Risco. Se o risco mudar, a chave muda e a síntese é refeita. Respostas de fallback não entram no cache.
+
 `GET /v1/llm` mostra o estado do circuito e quantas respostas há em cache, para acompanhar ao vivo na apresentação.
 
 **Quando não há o que devolver:** com o modelo fora e nenhum trecho encontrado, a resposta é **503** em `problem+json`. O serviço não inventa resposta.
@@ -98,6 +100,8 @@ O gargalo é **ler o contexto na CPU**: os 4 trechos quase triplicam a entrada. 
 - **GPU:** reduz o tempo em uma ordem de grandeza.
 - **Menos trechos ou trechos menores:** com `RAG_TRECHOS=2`, a entrada cai pela metade, mas o risco de perder o trecho certo aumenta.
 - **Cache:** perguntas repetidas, frequentes num painel, custam zero.
+
+**Aplicado:** `RAG_TRECHOS` caiu de 4 para 3, com a mesma qualidade na avaliação (10/11 fatos). O Ollama mantém o modelo carregado (`OLLAMA_KEEP_ALIVE=-1`), e a Análise, ao subir, aquece o modelo e gera a síntese das 5 regiões. Com o sistema inteiro rodando no notebook, a geração com RAG ficou entre 18 e 34 s, contra 17 s com a Análise sozinha: o gargalo é a CPU dividida com os outros containers.
 
 ### Memória
 

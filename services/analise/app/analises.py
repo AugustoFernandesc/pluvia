@@ -10,17 +10,23 @@ agente:
 
 Se o modelo estiver indisponível (``LLMIndisponivel``), a síntese é montada
 por regra com os mesmos dados das tools, e a resposta sai com origem FALLBACK.
+
+Sínteses geradas pelo modelo ficam em cache enquanto os dados da região e do
+risco forem os mesmos: a chave inclui esses dados, então qualquer mudança no
+panorama (uma sinalização reconhecida, por exemplo) gera uma síntese nova.
 """
 
+import hashlib
 import json
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 import httpx
+from cachetools import TTLCache
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -68,6 +74,10 @@ class FontesPluvia:
             "uf": corpo.get("uf"),
             "caracteristicas": corpo.get("caracteristicas"),
         }
+
+    async def ids_das_regioes(self) -> list[str]:
+        corpo = await self._get(f"{self._config.TERRITORIO_URL}/v1/regioes?tamanho=100")
+        return [item["id"] for item in corpo.get("itens", []) if "id" in item]
 
     async def risco(self, regiao_id: str) -> dict[str, Any]:
         corpo = await self._get(f"{self._config.RISCO_URL}/v1/panoramas/{regiao_id}")
@@ -200,9 +210,12 @@ def _fontes(regiao_id: str, regiao: dict[str, Any], risco: dict[str, Any], em: s
 
 
 class ServicoAnalises:
-    def __init__(self, llm: ClienteLLM, fontes: FontesPluvia) -> None:
+    def __init__(
+        self, llm: ClienteLLM, fontes: FontesPluvia, cache_ttl_s: int, cache_tamanho: int
+    ) -> None:
         self._llm = llm
         self._fontes = fontes
+        self._cache: TTLCache[str, Analise] = TTLCache(maxsize=cache_tamanho, ttl=cache_ttl_s)
         self._ferramentas = {f.name: f for f in criar_ferramentas(fontes)}
         self._pedir_dados = PROMPT | llm.chat_com_ferramentas(list(self._ferramentas.values()))
         self._sintetizar = llm.chat() | StrOutputParser()
@@ -211,6 +224,9 @@ class ServicoAnalises:
         inicio = time.perf_counter()
         consultado_em = datetime.now(UTC).isoformat(timespec="seconds")
         entrada = {"descricao": TIPOS[tipo], "regiao_id": regiao_id}
+        chave = await self._chave(regiao_id, tipo)
+        if chave and (guardada := self._cache.get(chave)):
+            return replace(guardada, origem="CACHE", latencia_ms=round((time.perf_counter() - inicio) * 1000))
         dados: dict[str, dict[str, Any]] = {}
         try:
             pedido: AIMessage = await self._llm.executar(self._pedir_dados, entrada)
@@ -224,7 +240,7 @@ class ServicoAnalises:
                     dados[nome] = json.loads(await self._ferramentas[nome].ainvoke({"regiao_id": regiao_id}))
             sintese = sintese_por_regra(tipo, dados["consultar_regiao"], dados["consultar_risco"])
             origem, modelo = "FALLBACK", None
-        return Analise(
+        analise = Analise(
             regiao_id=regiao_id,
             tipo=tipo,
             sintese=sintese.strip(),
@@ -234,6 +250,27 @@ class ServicoAnalises:
             latencia_ms=round((time.perf_counter() - inicio) * 1000),
             gerada_em=datetime.now(UTC).isoformat(),
         )
+        if chave and origem == "LLM":
+            self._cache[chave] = analise
+        return analise
+
+    async def preaquecer(self) -> int:
+        """Gera a síntese atual de cada região, para o painel abrir já com cache."""
+        regioes = await self._fontes.ids_das_regioes()
+        for regiao_id in regioes:
+            await self.analisar(regiao_id, "SITUACAO_ATUAL")
+        return len(regioes)
+
+    async def _chave(self, regiao_id: str, tipo: str) -> str | None:
+        """Chave do cache a partir dos dados atuais; None se algum dado faltar."""
+        atuais = {
+            nome: json.loads(await ferramenta.ainvoke({"regiao_id": regiao_id}))
+            for nome, ferramenta in self._ferramentas.items()
+        }
+        if any("erro" in valor for valor in atuais.values()):
+            return None
+        bruto = json.dumps([self._llm.modelo, regiao_id, tipo, atuais], sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(bruto.encode("utf-8")).hexdigest()
 
     async def _executar_ferramentas(
         self, pedido: AIMessage, regiao_id: str, dados: dict[str, dict[str, Any]]

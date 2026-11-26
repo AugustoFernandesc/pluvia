@@ -17,7 +17,7 @@ Requisitos: Docker com Compose, `kubectl` com um cluster local (o do Docker Desk
 
 ```bash
 # Docker Compose
-for f in services/*/.env.example infra/*/.env.example; do cp -n "$f" "${f%.example}"; done
+python scripts/preparar-env.py
 docker compose up -d --build
 
 # Kubernetes
@@ -537,7 +537,7 @@ Requisitos: Docker com Compose v2.20 ou superior. Para o Kubernetes, também um 
 Cada componente tem o próprio `.env`, que não é versionado. Crie-os a partir dos `.env.example` e troque as senhas antes de subir:
 
 ```bash
-for f in services/*/.env.example infra/*/.env.example; do cp -n "$f" "${f%.example}"; done
+python scripts/preparar-env.py
 docker compose up -d --build
 docker compose ps
 ```
@@ -565,7 +565,7 @@ docker compose exec operacoes wget -qO- 127.0.0.1:3000/health
 - **Keycloak:** [http://localhost:8000/auth](http://localhost:8000/auth), publicado por Kong.
 - **API Gateway:** `http://localhost:8000`; os clientes não acessam microsserviços diretamente.
 
-O cliente Web usa o client público `pluvia-web`, sem client secret. No console administrativo do realm `pluvia`, crie usuários e atribua papéis de realm `GESTOR` ou `TECNICO`; para fluxos privados de campo, use `AGENTE`. Defina as credenciais no próprio Keycloak, sem colocá-las nos arquivos do repositório. O realm já registra o redirect do Web em `http://localhost:5173/*` e exige PKCE `S256`.
+O cliente Web usa o client público `pluvia-web`, sem client secret. Com o sistema no ar, `python scripts/criar-usuarios-demo.py` cria `gestor` (`GESTOR`), `tecnico` (`TECNICO`) e `agente` (`AGENTE`), com a senha `PLUVIA_DEMO_SENHA` de `infra/keycloak/.env`, que não é versionado. O realm já registra o redirect do Web em `http://localhost:5173/*` e exige PKCE `S256`.
 
 Consulte o [roteiro da demonstração da Parte 4](docs/parte4/demo.md) para configuração, verificação de dependências, sequência de telas e diagnóstico.
 

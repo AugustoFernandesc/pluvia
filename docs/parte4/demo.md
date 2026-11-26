@@ -6,13 +6,13 @@ Este roteiro executa os clientes pelos endereços publicados no host. O caminho 
 
 ### Arquivos de ambiente
 
-Na raiz do repositório, no Git Bash:
+Na raiz do repositório:
 
 ```bash
-for f in services/*/.env.example infra/*/.env.example; do cp -n "$f" "${f%.example}"; done
+python scripts/preparar-env.py
 ```
 
-Gere senhas locais únicas e substitua todos os valores de exemplo antes de iniciar. Nos arquivos `services/risco/.env`, `services/operacoes/.env`, `services/equipes/.env` e `services/frota/.env`, `RABBITMQ_USER`/`RABBITMQ_PASSWORD` precisam corresponder a `RABBITMQ_SERVICOS_USER`/`RABBITMQ_SERVICOS_PASSWORD` em `infra/rabbitmq/.env`. Os destinos dos BFFs já usam os nomes de serviço do Compose em `TERRITORIO_URL`, `OPERACOES_URL`, `RISCO_URL` e `ANALISE_URL`; os timeouts são configuráveis nos mesmos `.env`.
+O script cria os `.env` que faltam e, nos que já existem, só acrescenta as chaves novas, sem sobrescrever nada. `RABBITMQ_USER`/`RABBITMQ_PASSWORD` dos serviços recebem os valores de `RABBITMQ_SERVICOS_*` do `infra/rabbitmq/.env`. Troque as senhas de exemplo antes de expor o ambiente. Os destinos dos BFFs já usam os nomes de serviço do Compose em `TERRITORIO_URL`, `OPERACOES_URL`, `RISCO_URL` e `ANALISE_URL`; os timeouts são configuráveis nos mesmos `.env`.
 
 O `infra/keycloak/.env` define as credenciais do administrador inicial. Guarde-as localmente e não as adicione ao Git. O arquivo `services/bff-web/.env` anuncia o issuer externo `http://localhost:8000/auth/realms/pluvia` e consulta o JWKS pela rede interna `http://keycloak:8080/...`.
 
@@ -41,7 +41,13 @@ Confira o estado OIDC pelo gateway:
 curl --fail http://localhost:8000/auth/realms/pluvia/.well-known/openid-configuration
 ```
 
-No console administrativo do Keycloak, abra o realm `pluvia`, crie usuários locais e atribua papéis de realm. Use `GESTOR` para a ação preventiva e SAGA, `TECNICO` para a visão técnica e reconhecimento de sinalizações, e `AGENTE` para fluxos privados de campo do cliente Mobile. O usuário público do Mobile não precisa de conta. O login do painel Web é Authorization Code com PKCE `S256`, sem client secret no navegador.
+Crie os usuários de demonstração `gestor`, `tecnico` e `agente`, com a senha `PLUVIA_DEMO_SENHA` de `infra/keycloak/.env`:
+
+```bash
+python scripts/criar-usuarios-demo.py
+```
+
+O script é idempotente: rodar de novo reaplica senha e papéis. Use `GESTOR` para a ação preventiva e SAGA, `TECNICO` para a visão técnica e reconhecimento de sinalizações, e `AGENTE` para fluxos privados de campo do cliente Mobile. O usuário público do Mobile não precisa de conta. O login do painel Web é Authorization Code com PKCE `S256`, sem client secret no navegador.
 
 ## Demonstração
 
@@ -84,9 +90,9 @@ docker compose up -d --build
 
 Se um banco for recriado, evite apagar volumes da apresentação sem necessidade: `docker compose down -v` remove os dados persistidos.
 
-## Dependências atualmente pendentes
+## Limitações conhecidas
 
-As rotas de ação e SAGA de Operações, os participantes Equipes/Frota e `POST /v1/analises` da Análise foram incorporados da `develop` em `BranchLucas`. A integração CI sobe esses serviços e confere uma ação real até o estado terminal, além de compor uma síntese regional com fontes reais. A análise usa fallback se Ollama não estiver pronto.
+A Análise carrega o modelo e gera a síntese das 5 regiões na subida (log `sínteses de 5 regiões geradas e guardadas em cache`). Espere esse log antes da demonstração: a síntese passa a sair do cache, e só é refeita quando os dados de Território ou Risco mudam. Uma pergunta RAG nova leva de 15 a 40 s na CPU, conforme a carga do notebook; repetida, sai do cache.
 
 O serviço Território atual oferece regiões, mas ainda não expõe vulnerabilidade nem ocorrências; o BFF mantém esses blocos nulos e avisa sem inventar dados. Perguntas RAG podem depender de documentos indexados e dos modelos Ollama já carregados; sem trechos, a Análise responde `503 problem+json`, que o painel apresenta como erro legível. A síntese por região continua disponível com fallback do próprio serviço quando o modelo está indisponível.
 

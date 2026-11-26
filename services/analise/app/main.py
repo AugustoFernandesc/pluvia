@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import logging
 import socket
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -10,6 +11,23 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response
 
 from app import api, health
+from app.llm import LLMIndisponivel
+
+log = logging.getLogger(__name__)
+
+
+async def _preparar(servicos: api.Servicos, base_conhecimento: Path) -> None:
+    """Indexa a base de conhecimento e deixa o modelo carregado para a primeira pergunta."""
+    await servicos.ingestor.manter_base_local(base_conhecimento)
+    try:
+        await servicos.llm.aquecer()
+        log.info("modelo %s carregado", servicos.llm.modelo)
+    except LLMIndisponivel as erro:
+        log.info("modelo não aquecido (%s); a primeira pergunta vai carregá-lo", erro)
+        return
+    total = await servicos.analises.preaquecer()
+    log.info("sínteses de %s regiões geradas e guardadas em cache", total)
+
 
 # Identifica a réplica que respondeu. No Kubernetes, o hostname é o nome do pod,
 # o que permite ver a carga sendo dividida entre as réplicas com um simples curl.
@@ -28,7 +46,7 @@ def criar_app(
             await abrir()
         indexacao = None
         if servicos is not None and base_conhecimento is not None:
-            indexacao = asyncio.create_task(servicos.ingestor.manter_base_local(base_conhecimento))
+            indexacao = asyncio.create_task(_preparar(servicos, base_conhecimento))
         try:
             yield
         finally:

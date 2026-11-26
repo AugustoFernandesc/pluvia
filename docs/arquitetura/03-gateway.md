@@ -26,6 +26,7 @@ Kong foi escolhido porque oferece por plugins os três recursos de que a Pluvia 
 | `/mobile/v1/publico/*` | BFF Mobile | Nenhuma | 30 req/min por IP |
 | `/mobile/v1/*` | BFF Mobile | JWT obrigatório | 120 req/min por usuário |
 | `/auth/*` | Keycloak | Nenhuma | 20 req/min por IP |
+| `/auth/resources/*` | Keycloak (arquivos estáticos da tela de login) | Nenhuma | Sem limite: só `GET` de CSS, JS e fontes, cerca de 10 por login |
 
 ### Escopo efetivo do limite autenticado
 

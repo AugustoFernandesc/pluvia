@@ -138,7 +138,7 @@ async def test_panorama_inexistente_devolve_dado_indisponivel(servidor: str):
 
 def servico(territorio: str, risco: str) -> ServicoAnalises:
     llm = ClienteLLM(ler_config_llm(OLLAMA_FORA_DO_AR))
-    return ServicoAnalises(llm, FontesPluvia(ConfigFontes(territorio, risco, 2)))
+    return ServicoAnalises(llm, FontesPluvia(ConfigFontes(territorio, risco, 2)), 60, 10)
 
 
 async def test_sem_modelo_a_sintese_vem_por_regra_com_regiao_e_nivel(servidor: str):
@@ -165,3 +165,12 @@ async def test_sem_modelo_e_sem_risco_a_sintese_diz_que_o_nivel_esta_indisponive
 def test_config_das_fontes_nomeia_as_variaveis_ausentes():
     with pytest.raises(ValueError, match="TERRITORIO_URL, RISCO_URL, FONTES_TIMEOUT_S"):
         ler_config_fontes({})
+
+
+async def test_fallback_nao_entra_no_cache(servidor: str):
+    analises = servico(servidor, servidor)
+
+    await analises.analisar(CENTRO, "SITUACAO_ATUAL")
+    segunda = await analises.analisar(CENTRO, "SITUACAO_ATUAL")
+
+    assert segunda.origem == "FALLBACK"

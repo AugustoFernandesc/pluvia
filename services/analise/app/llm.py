@@ -67,6 +67,13 @@ class ClienteLLM:
         """Executa uma chain que usa o modelo, protegida pelo circuit breaker."""
         return await self._proteger(lambda: runnable.ainvoke(entrada))
 
+    async def aquecer(self) -> None:
+        """Carrega o modelo de geração na memória do Ollama com uma chamada curta.
+
+        Sem isso, a primeira pergunta paga o carregamento do modelo do disco.
+        """
+        await self.executar(self.chat(), "Responda apenas: ok")
+
     async def embedding_consulta(self, texto: str) -> list[float]:
         return await self._proteger(lambda: self._embeddings.aembed_query(texto))
 
