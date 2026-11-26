@@ -24,3 +24,6 @@ data:
   CACHE_TAMANHO: "256"
   RAG_TRECHOS: "4"
   BASE_CONHECIMENTO_DIR: "/app/conhecimento"
+  TERRITORIO_URL: "http://territorio:3000"
+  RISCO_URL: "http://risco:3000"
+  FONTES_TIMEOUT_S: "5"
