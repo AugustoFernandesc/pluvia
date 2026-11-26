@@ -78,6 +78,17 @@ services:
               exposed_headers: ["ETag", "X-Request-ID"]
               credentials: false
 
+  # Static files of the Keycloak login page (CSS, JS, fonts). One login loads
+  # about 10 of them, so they stay out of the 20/min limit of the /auth route,
+  # which protects the login and token endpoints.
+  - name: keycloak-recursos
+    url: http://keycloak:8080/resources
+    routes:
+      - name: auth-recursos
+        paths: ["/auth/resources"]
+        methods: ["GET"]
+        strip_path: true
+
   - name: keycloak
     url: http://keycloak:8080
     routes:
