@@ -68,8 +68,21 @@ def prepare_kubernetes_secret_envs() -> None:
         write_env(example.parent / "secret.env", values)
 
 
+def synchronize_rabbitmq_service_credentials() -> None:
+    """Keep every RabbitMQ consumer aligned with the generated service account."""
+    rabbitmq_path = ROOT / "infra" / "rabbitmq" / ".env"
+    rabbitmq = read_env_example(rabbitmq_path)
+    for service in ("risco", "operacoes", "equipes", "frota"):
+        service_path = ROOT / "services" / service / ".env"
+        values = read_env_example(service_path)
+        values["RABBITMQ_USER"] = rabbitmq["RABBITMQ_SERVICOS_USER"]
+        values["RABBITMQ_PASSWORD"] = rabbitmq["RABBITMQ_SERVICOS_PASSWORD"]
+        write_env(service_path, values)
+
+
 def main() -> None:
     prepare_compose_envs()
+    synchronize_rabbitmq_service_credentials()
     prepare_kubernetes_secret_envs()
     print("Created disposable, ignored environment files for hosted CI.")
 

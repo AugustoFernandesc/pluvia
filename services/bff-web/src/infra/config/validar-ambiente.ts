@@ -3,6 +3,13 @@ export interface AmbienteBff {
   KEYCLOAK_ISSUER: string;
   KEYCLOAK_JWKS_URL: string;
   OIDC_AUDIENCE: string;
+  TERRITORIO_URL: string;
+  OPERACOES_URL: string;
+  RISCO_URL: string;
+  ANALISE_URL: string;
+  UPSTREAM_TIMEOUT_MS: number;
+  ANALISE_TIMEOUT_MS: number;
+  ANALISE_SINTESE_TIMEOUT_MS: number;
 }
 
 const TEXTO_OBRIGATORIO = [
@@ -33,6 +40,14 @@ function portaValida(valor: string): boolean {
   return porta >= 1 && porta <= 65535;
 }
 
+function inteiroPositivo(config: Record<string, unknown>, nome: string, padrao: number): number {
+  const valor = config[nome] === undefined ? String(padrao) : config[nome];
+  if (typeof valor !== 'string' || !/^\d+$/.test(valor) || Number(valor) < 1) {
+    throw new Error(`Variável ${nome} inválida (esperado inteiro positivo).`);
+  }
+  return Number(valor);
+}
+
 export function validarAmbiente(config: Record<string, unknown>): AmbienteBff {
   const ausentes = TEXTO_OBRIGATORIO.filter(
     (nome) => typeof config[nome] !== 'string' || config[nome] === '',
@@ -52,10 +67,28 @@ export function validarAmbiente(config: Record<string, unknown>): AmbienteBff {
     }
   }
 
+  const urls = {
+    TERRITORIO_URL: 'http://territorio:3000',
+    OPERACOES_URL: 'http://operacoes:3000',
+    RISCO_URL: 'http://risco:3000',
+    ANALISE_URL: 'http://analise:8000',
+  };
+  for (const [nome, padrao] of Object.entries(urls)) {
+    const valor = config[nome] === undefined ? padrao : config[nome];
+    if (typeof valor !== 'string' || !ehUrlHttp(valor)) {
+      throw new Error(`Variável ${nome} deve ser uma URL HTTP(S) válida.`);
+    }
+    urls[nome as keyof typeof urls] = valor;
+  }
+
   return {
     PORT: Number(porta),
     KEYCLOAK_ISSUER: config.KEYCLOAK_ISSUER as string,
     KEYCLOAK_JWKS_URL: config.KEYCLOAK_JWKS_URL as string,
     OIDC_AUDIENCE: config.OIDC_AUDIENCE as string,
+    ...urls,
+    UPSTREAM_TIMEOUT_MS: inteiroPositivo(config, 'UPSTREAM_TIMEOUT_MS', 2_000),
+    ANALISE_TIMEOUT_MS: inteiroPositivo(config, 'ANALISE_TIMEOUT_MS', 120_000),
+    ANALISE_SINTESE_TIMEOUT_MS: inteiroPositivo(config, 'ANALISE_SINTESE_TIMEOUT_MS', 30_000),
   };
 }

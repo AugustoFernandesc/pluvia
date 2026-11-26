@@ -524,7 +524,7 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 | Mensageria | RabbitMQ, com plugin MQTT |
 | Gateway | Kong |
 | Identidade | Keycloak |
-| Clientes | React (web) e React Native com Expo (mobile) |
+| Clientes da Parte 4 | Painel Web e consulta pública Mobile em HTML, CSS e JavaScript, servidos por Nginx |
 
 ---
 
@@ -542,7 +542,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Sobem os serviços de domínio, cada um com o próprio banco, e o RabbitMQ:
+O `docker-compose.yml` da raiz inclui o `compose.yaml` de cada componente. Sobem os serviços de domínio, cada um com o próprio banco, o RabbitMQ, os BFFs, Keycloak, Kong e os clientes:
 
 | Serviço | Banco |
 | ------- | ----- |
@@ -557,6 +557,17 @@ Todos devem aparecer como `healthy`. Cada banco fica numa rede exclusiva com o s
 ```bash
 docker compose exec operacoes wget -qO- 127.0.0.1:3000/health
 ```
+
+### Clientes da Parte 4
+
+- **Painel Web:** [http://localhost:5173](http://localhost:5173) — login Keycloak com Authorization Code + PKCE; usuários precisam do papel `GESTOR` ou `TECNICO`.
+- **Consulta Mobile pública:** [http://localhost:5174](http://localhost:5174) — sem login; consulta catálogo e resumo por Kong e BFF Mobile.
+- **Keycloak:** [http://localhost:8000/auth](http://localhost:8000/auth), publicado por Kong.
+- **API Gateway:** `http://localhost:8000`; os clientes não acessam microsserviços diretamente.
+
+O cliente Web usa o client público `pluvia-web`, sem client secret. No console administrativo do realm `pluvia`, crie usuários e atribua papéis de realm `GESTOR` ou `TECNICO`; para fluxos privados de campo, use `AGENTE`. Defina as credenciais no próprio Keycloak, sem colocá-las nos arquivos do repositório. O realm já registra o redirect do Web em `http://localhost:5173/*` e exige PKCE `S256`.
+
+Consulte o [roteiro da demonstração da Parte 4](docs/parte4/demo.md) para configuração, verificação de dependências, sequência de telas e diagnóstico.
 
 Para derrubar, use `docker compose down`. O banco de cada serviço fica num volume nomeado, então os dados permanecem. Para apagá-los, use `docker compose down -v`.
 
@@ -584,7 +595,7 @@ Para criar um novo serviço NestJS, siga o [README do modelo](templates/servico-
 
 O BFF Web, BFF Mobile, Keycloak, Kong DB-less e Ingress Traefik estão documentados em [`docs/parte3/validacao-k8s.md`](docs/parte3/validacao-k8s.md). O guia registra o bootstrap de Docker e Kubernetes, os endpoints técnicos de autenticação, a CI e o diagnóstico de falhas comuns.
 
-Os BFFs não possuem banco de dados. Nesta etapa, as rotas sob `/_system` são verificações técnicas; os contratos de negócio permanecem descritos em `docs/api/` e não são apresentados como implementados.
+Os BFFs não possuem banco de dados. As rotas `/_system` permanecem como verificações técnicas; os fluxos de negócio da Parte 4 e suas dependências estão descritos em [`docs/parte4/demo.md`](docs/parte4/demo.md) e nos contratos de [`docs/api/`](docs/api/).
 
 ## 🤝 Como colaboramos neste repositório
 

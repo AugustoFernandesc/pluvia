@@ -27,7 +27,7 @@ services:
         config:
           origins: ["http://localhost:5173"]
           methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
-          headers: ["Accept", "Authorization", "Content-Type", "X-Request-ID"]
+          headers: ["Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"]
           exposed_headers: ["X-Request-ID"]
           credentials: true
 
@@ -43,6 +43,13 @@ services:
         paths: ["/mobile/v1/publico"]
         strip_path: false
         plugins:
+          - name: cors
+            config:
+              origins: ["http://localhost:5174"]
+              methods: ["GET", "OPTIONS"]
+              headers: ["Accept", "Content-Type", "If-None-Match", "X-Request-ID"]
+              exposed_headers: ["ETag", "X-Request-ID"]
+              credentials: false
           - name: rate-limiting
             config:
               minute: 30
@@ -63,6 +70,13 @@ services:
               limit_by: header
               header_name: X-Pluvia-RateLimit-Subject
               policy: local
+          - name: cors
+            config:
+              origins: ["http://localhost:5174"]
+              methods: ["GET", "POST", "OPTIONS"]
+              headers: ["Accept", "Authorization", "Content-Type", "If-None-Match", "X-Request-ID"]
+              exposed_headers: ["ETag", "X-Request-ID"]
+              credentials: false
 
   - name: keycloak
     url: http://keycloak:8080
@@ -76,6 +90,12 @@ services:
           minute: 20
           limit_by: ip
           policy: local
+      - name: cors
+        config:
+          origins: ["http://localhost:5173"]
+          methods: ["GET", "POST", "OPTIONS"]
+          headers: ["Accept", "Content-Type"]
+          credentials: false
 
 consumers:
   - username: pluvia-keycloak

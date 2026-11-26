@@ -5,8 +5,10 @@ import argparse
 import base64
 import json
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 import time
+from zoneinfo import ZoneInfo
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -72,6 +74,18 @@ def run(args) -> None:
     direct_root = args.keycloak_url.rstrip("/")
     gateway_root = args.gateway_url.rstrip("/")
     realm = "pluvia"
+
+    if args.check_mobile_unavailable:
+        status, body, headers = http_json(
+            f"{gateway_root}/mobile/v1/publico/regioes/6f1c2a10-0000-4000-8000-000000000001/resumo"
+        )
+        assert_status(status, 503, "resumo Mobile com Território indisponível")
+        if not str(headers.get("Content-Type", "")).startswith("application/problem+json"):
+            raise AssertionError("A indisponibilidade não respondeu application/problem+json.")
+        if not isinstance(body, dict) or body.get("status") != 503:
+            raise AssertionError("O problema Mobile não contém status 503.")
+        print("Indisponibilidade real de Território propagada como 503 problem+json pelo Kong e BFF Mobile.")
+        return
 
     # Check the externally visible issuer through the actual gateway/Ingress.
     status, metadata, _ = http_json(
@@ -208,6 +222,9 @@ def run(args) -> None:
         path: str,
         token: str | None = None,
         forged_rate_subject: str | None = None,
+        method: str = "GET",
+        data=None,
+        extra_headers=None,
     ):
         headers = {}
         if token:
@@ -216,7 +233,8 @@ def run(args) -> None:
             headers["X-Pluvia-RateLimit-Subject"] = forged_rate_subject
         if args.host_header:
             headers["Host"] = args.host_header
-        return http_json(f"{gateway_root}{path}", headers=headers)
+        headers.update(extra_headers or {})
+        return http_json(f"{gateway_root}{path}", method=method, data=data, headers=headers)
 
     def assert_quota(response_headers, limit: int, remaining: int, label: str) -> None:
         actual_limit = response_headers.get("X-RateLimit-Limit-Minute")
@@ -291,6 +309,118 @@ def run(args) -> None:
     assert_status(status, 200, "rota pública Mobile")
     if public_response.get("access") != "public":
         raise AssertionError("A rota pública Mobile não respondeu pelo BFF esperado.")
+
+    # Traverse both public clients' API paths through Kong to the real domain services.
+    regiao_id = "6f1c2a10-0000-4000-8000-000000000001"
+    assert_status(
+        gateway_request(f"/web/v1/regioes/{regiao_id}")[0],
+        401,
+        "região Web sem JWT",
+    )
+    assert_status(
+        gateway_request(f"/web/v1/regioes/{regiao_id}", tokens["AGENTE_1"])[0],
+        403,
+        "região Web com papel AGENTE",
+    )
+    status, detalhe_web, _ = gateway_request(
+        f"/web/v1/regioes/{regiao_id}", tokens["GESTOR"]
+    )
+    assert_status(status, 200, "região Centro pelo BFF Web")
+    if (
+        detalhe_web.get("regiao", {}).get("id") != regiao_id
+        or detalhe_web.get("regiao", {}).get("nome") != "Centro"
+        or detalhe_web.get("panorama", {}).get("regiaoId") != regiao_id
+        or detalhe_web.get("panorama", {}).get("nivelAtencao") != "ATENCAO"
+        or not isinstance(detalhe_web.get("analise", {}).get("sintese"), str)
+        or not detalhe_web.get("analise", {}).get("fontes")
+    ):
+        raise AssertionError("BFF Web não compôs os dados reais de Centro, Risco e Análise.")
+
+    status, regioes_mobile, _ = gateway_request(
+        "/mobile/v1/publico/regioes?municipio=Lavras"
+    )
+    assert_status(status, 200, "lista pública de regiões pelo BFF Mobile")
+    if not any(item.get("id") == regiao_id and item.get("nome") == "Centro" for item in regioes_mobile.get("itens", [])):
+        raise AssertionError("A lista Mobile não contém a região Centro devolvida por Território.")
+
+    status, resumo_mobile, _ = gateway_request(
+        f"/mobile/v1/publico/regioes/{regiao_id}/resumo"
+    )
+    assert_status(status, 200, "resumo público Mobile da região Centro")
+    if (
+        resumo_mobile.get("regiao") != detalhe_web["regiao"]["nome"]
+        or resumo_mobile.get("nivel") != detalhe_web["panorama"]["nivelAtencao"]
+        or resumo_mobile.get("atualizadoEm") != detalhe_web["panorama"]["atualizadoEm"]
+    ):
+        raise AssertionError("Os clientes Web e Mobile não refletem o mesmo panorama de origem.")
+
+    pedido_acao = {
+        "regiaoId": regiao_id,
+        "tipo": "LIMPEZA_DRENAGEM",
+        "data": (datetime.now(ZoneInfo("America/Sao_Paulo")).date() + timedelta(days=1)).isoformat(),
+        "turno": "MANHA",
+        "especialidade": "DRENAGEM",
+        "categoriaRecurso": "CAMINHAO_HIDROJATO",
+    }
+    assert_status(
+        gateway_request("/web/v1/acoes", tokens["AGENTE_1"], method="POST", data=pedido_acao)[0],
+        403,
+        "criação de ação pelo perfil AGENTE",
+    )
+    status, acao, cabecalhos_acao = gateway_request(
+        "/web/v1/acoes",
+        tokens["GESTOR"],
+        method="POST",
+        data=pedido_acao,
+        extra_headers={"Idempotency-Key": f"ci-pluvia-{int(time.time())}"},
+    )
+    assert_status(status, 202, "solicitação real de ação preventiva pelo BFF Web")
+    acao_id = acao.get("id") if isinstance(acao, dict) else None
+    if not acao_id or cabecalhos_acao.get("Location") != f"/web/v1/acoes/{acao_id}":
+        raise AssertionError("Operações não devolveu a ação e Location público esperados.")
+    if acao.get("_links", {}).get("self", {}).get("href") != f"/web/v1/acoes/{acao_id}":
+        raise AssertionError("BFF Web não reescreveu o link HATEOAS da ação.")
+
+    saga = None
+    acao_atual = acao
+    for _ in range(40):
+        saga_status, saga, _ = gateway_request(
+            f"/web/v1/acoes/{acao_id}/saga", tokens["GESTOR"]
+        )
+        action_status, acao_atual, _ = gateway_request(
+            f"/web/v1/acoes/{acao_id}", tokens["GESTOR"]
+        )
+        if saga_status == 200 and action_status == 200 and saga.get("estado") in {"CONCLUIDA", "COMPENSADA"}:
+            break
+        time.sleep(1)
+    if (
+        not isinstance(saga, dict)
+        or saga.get("estado") != "CONCLUIDA"
+        or not isinstance(saga.get("passos"), list)
+        or len(saga["passos"]) < 4
+        or not isinstance(acao_atual, dict)
+        or acao_atual.get("estado") != "CONFIRMADA"
+    ):
+        raise AssertionError("A SAGA real não concluiu a ação ou não publicou as quatro etapas esperadas.")
+    print("Ação preventiva percorreu Operações → Equipes → Frota e a SAGA terminou com estado e etapas reais.")
+
+    status, analise_problema, analise_headers = gateway_request(
+        "/web/v1/consultas",
+        tokens["TECNICO"],
+        method="POST",
+        data={
+            "pergunta": "Quais cuidados devem ser avaliados antes de uma chuva intensa?",
+            "usarRecuperacao": False,
+        },
+    )
+    assert_status(status, 503, "Análise sem modelo de linguagem disponível no CI")
+    if (
+        not str(analise_headers.get("Content-Type", "")).startswith("application/problem+json")
+        or not isinstance(analise_problema, dict)
+        or analise_problema.get("status") != 503
+    ):
+        raise AssertionError("BFF Web não preservou o problema 503 emitido por Análise.")
+    print("Consulta chegou ao serviço Análise real; sem Ollama no runner, o BFF preservou o 503 problem+json.")
     assert_status(
         gateway_request("/mobile/v1/_system/authorization-check")[0],
         401,
@@ -323,7 +453,7 @@ def run(args) -> None:
         tokens["AGENTE_1"],
         forged_rate_subject="client-controlled-b",
     )
-    assert_status(status, 200, "segunda requisiÃ§Ã£o Mobile com AGENTE_1")
+    assert_status(status, 200, "segunda requisição Mobile com AGENTE_1")
     assert_quota(response_headers, 120, 118, "segunda Mobile do AGENTE_1")
     status, mobile_agent_2, response_headers = gateway_request(
         "/mobile/v1/_system/authorization-check",
@@ -361,6 +491,11 @@ def main() -> None:
     parser.add_argument("--gateway-url", required=True)
     parser.add_argument("--issuer", required=True)
     parser.add_argument("--host-header", default="")
+    parser.add_argument(
+        "--check-mobile-unavailable",
+        action="store_true",
+        help="Confirma 503 problem+json após parar Território na integração real.",
+    )
     args = parser.parse_args()
     try:
         run(args)

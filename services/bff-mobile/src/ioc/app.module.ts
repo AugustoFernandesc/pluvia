@@ -8,17 +8,27 @@ import { RolesGuard } from '@app/auth/roles.guard';
 import { RequestLoggingMiddleware } from '@app/auth/request-logging.middleware';
 import { PublicTechnicalController } from '@app/technical/public-technical.controller';
 import { TechnicalController } from '@app/technical/technical.controller';
+import { ClienteServicosService } from '@app/integracao/cliente-servicos.service';
+import { RegioesPublicasController } from '@app/publico/regioes-publicas.controller';
+import { ResumoPublicoController } from '@app/publico/resumo-publico.controller';
 
 import { GlobalModule } from './global.module';
 
 @Module({
   imports: [GlobalModule],
-  controllers: [HealthController, PublicTechnicalController, TechnicalController],
+  controllers: [
+    HealthController,
+    PublicTechnicalController,
+    TechnicalController,
+    RegioesPublicasController,
+    ResumoPublicoController,
+  ],
   providers: [
     JwtVerifierService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     RequestLoggingMiddleware,
+    ClienteServicosService,
   ],
 })
 export class AppModule implements NestModule {
