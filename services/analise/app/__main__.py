@@ -11,6 +11,7 @@ from pathlib import Path
 
 import uvicorn
 
+from app.analises import FontesPluvia, ServicoAnalises, ler_config_fontes
 from app.api import Servicos
 from app.base_conhecimento import RecuperadorPluvia, RepositorioConhecimento
 from app.config import validar_ambiente
@@ -26,6 +27,7 @@ def main() -> None:
     try:
         ambiente = validar_ambiente(os.environ)
         config = ler_config_llm(os.environ)
+        fontes = ler_config_fontes(os.environ)
     except ValueError as erro:
         print(erro, file=sys.stderr)
         sys.exit(1)
@@ -40,6 +42,7 @@ def main() -> None:
         consultas=ServicoConsultas(llm, recuperador, config.CACHE_TTL_S, config.CACHE_TAMANHO),
         repositorio=repositorio,
         ingestor=Ingestor(repositorio, llm),
+        analises=ServicoAnalises(llm, FontesPluvia(fontes)),
     )
     app = criar_app(banco, servicos, Path(config.BASE_CONHECIMENTO_DIR))
     uvicorn.run(app, host="0.0.0.0", port=ambiente.PORT)
