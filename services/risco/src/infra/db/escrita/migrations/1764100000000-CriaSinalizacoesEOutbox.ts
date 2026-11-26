@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-import { SINALIZACAO_CENTRO } from '@infra/db/semente';
+import { haHoras, SINALIZACOES_SEMENTE, TECNICO_SEMENTE } from '@infra/db/semente';
 
 /**
  * Banco de escrita: as sinalizações (07-cqrs.md) e a outbox. A outbox fica no
@@ -41,12 +41,27 @@ export class CriaSinalizacoesEOutbox1764100000000 implements MigrationInterface 
       'CREATE INDEX outbox_pendentes ON outbox (criado_em) WHERE publicado_em IS NULL',
     );
 
-    const s = SINALIZACAO_CENTRO;
-    await queryRunner.query(
-      `INSERT INTO sinalizacoes (id, regiao_id, origem, nivel_atencao, motivo, fatores, estado, emitida_em)
-       VALUES ($1, $2, $3, $4, $5, $6, 'ABERTA', now())`,
-      [s.id, s.regiaoId, s.origem, s.nivel, s.motivo, JSON.stringify(s.fatores)],
-    );
+    for (const s of SINALIZACOES_SEMENTE) {
+      await queryRunner.query(
+        `INSERT INTO sinalizacoes
+           (id, regiao_id, origem, nivel_atencao, motivo, fatores, estado, emitida_em,
+            reconhecida_por, reconhecida_em, encerrada_em)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          s.id,
+          s.regiaoId,
+          s.origem,
+          s.nivel,
+          s.motivo,
+          JSON.stringify(s.fatores),
+          s.estado,
+          haHoras(s.emitidaHaHoras),
+          s.reconhecidaHaHoras === undefined ? null : TECNICO_SEMENTE,
+          s.reconhecidaHaHoras === undefined ? null : haHoras(s.reconhecidaHaHoras),
+          s.encerradaHaHoras === undefined ? null : haHoras(s.encerradaHaHoras),
+        ],
+      );
+    }
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
