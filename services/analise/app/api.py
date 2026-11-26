@@ -1,13 +1,15 @@
-"""Rotas /v1 da Análise: consultas, base de conhecimento e estado do LLM."""
+"""Rotas /v1 da Análise: análises, consultas, base de conhecimento e estado do LLM."""
 
 import asyncio
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, HttpUrl
 
+from app.analises import ServicoAnalises
 from app.base_conhecimento import RepositorioConhecimento
 from app.ingestao import Ingestor
 from app.llm import ClienteLLM
@@ -25,6 +27,7 @@ class Servicos:
     consultas: ServicoConsultas
     repositorio: RepositorioConhecimento
     ingestor: Ingestor
+    analises: ServicoAnalises
 
 
 def servicos(request: Request) -> Servicos:
@@ -38,6 +41,11 @@ class PedidoConsulta(BaseModel):
     pergunta: str = Field(min_length=5, max_length=1000)
     regiaoId: str | None = None
     usarRecuperacao: bool = True
+
+
+class PedidoAnalise(BaseModel):
+    regiaoId: UUID
+    tipo: Literal["SITUACAO_ATUAL", "CENARIO_PREVISTO"]
 
 
 class PedidoDocumento(BaseModel):
@@ -56,6 +64,12 @@ def problema(status: int, tipo: str, titulo: str, detalhe: str, instancia: str) 
 
 
 router = APIRouter(prefix="/v1")
+
+
+@router.post("/analises")
+async def analisar(pedido: PedidoAnalise, s: Dependencias):
+    analise = await s.analises.analisar(str(pedido.regiaoId), pedido.tipo)
+    return analise.json()
 
 
 @router.post("/consultas")
