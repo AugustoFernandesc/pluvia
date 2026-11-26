@@ -3,51 +3,62 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#102f35">
-    <title>Pluvia · Painel de gestão</title>
+    <meta name="theme-color" content="#083461">
+    <title>Pluvia · Visão geral</title>
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/details.css">
     <script src="/app.js" defer></script>
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Pluvia, início"><span class="brand-mark" aria-hidden="true">P</span><span>pluvia<span class="brand-dot">.</span><small>gestão territorial</small></span></a>
-      <div class="account" id="account" aria-live="polite"><span id="identity">Acesso da equipe</span><button class="button button-outline" id="login-button" type="button">Entrar com Keycloak</button><button class="button button-outline" id="logout-button" type="button" hidden>Sair</button></div>
-    </header>
-
-    <main class="shell">
-      <section class="hero"><div><p class="eyebrow">CENTRAL DE MONITORAMENTO · LAVRAS, MG</p><h1>Decisões melhores começam com o território.</h1><p class="hero-copy">Acompanhe os dados de risco disponíveis e organize ações preventivas com rastreabilidade.</p></div><div class="hero-stamp" aria-hidden="true"><span>PL</span><small>apoio à decisão</small></div></section>
-      <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
-
-      <section class="section-block" aria-labelledby="overview-title">
-        <div class="section-heading"><div><p class="eyebrow">VISÃO OPERACIONAL</p><h2 id="overview-title">Painel de regiões</h2></div><button class="button button-light" id="refresh-button" type="button" disabled>Atualizar painel</button></div>
-        <div class="metric-grid" id="metrics" aria-live="polite"><article class="metric-card metric-placeholder"><span>Entre para carregar os dados de Risco.</span></article></div>
-        <div class="region-layout">
-          <article class="panel-card region-card"><div class="card-heading"><div><p class="eyebrow">DETALHE TÉCNICO</p><h3>Região selecionada</h3></div><span class="live-dot" aria-label="Consulta sob demanda"></span></div><label for="region-select">Região</label><select id="region-select" disabled><option>Faça login para carregar as regiões</option></select><div class="risk-badge" id="risk-badge" hidden></div><div id="region-detail" class="data-block" aria-live="polite"><p class="muted">Os dados reais do Território e de Risco serão exibidos aqui.</p></div></article>
-          <aside class="panel-card map-card" aria-label="Resumo de atenção por região"><p class="eyebrow">SITUAÇÃO DISPONÍVEL</p><h3>Leitura rápida</h3><div id="region-list" class="region-list"><p class="muted">Entre para consultar o panorama.</p></div><p class="source-note">Indicadores apresentados conforme o panorama mais recente publicado pelos serviços de origem.</p></aside>
+    <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+    <div class="app">
+      <aside class="sidenav" id="sidenav">
+        <div class="sidenav-head">
+          <a class="brand" href="#/visao-geral" aria-label="Pluvia, visão geral"><img src="/logo.png" alt="Pluvia" width="360" height="272"></a>
+          <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="sidenav-panel" aria-expanded="false" aria-label="Menu"><span class="menu-toggle-bars" aria-hidden="true"></span></button>
         </div>
-      </section>
-
-      <section class="section-block" aria-labelledby="actions-title"><div class="section-heading"><div><p class="eyebrow">PLANEJAMENTO</p><h2 id="actions-title">Ação preventiva</h2></div><span class="role-pill" id="role-label">Perfil</span></div>
-        <div class="action-layout">
-          <form class="panel-card form-card" id="action-form" hidden><div class="card-heading"><div><p class="eyebrow">NOVA SOLICITAÇÃO</p><h3>Pedir ação preventiva</h3></div></div>
-            <div class="form-grid">
-              <label>Tipo de ação<select name="tipo" required><option value="LIMPEZA_DRENAGEM">Limpeza de drenagem</option><option value="VISTORIA">Vistoria</option><option value="DESOBSTRUCAO">Desobstrução</option><option value="INSPECAO_PONTO_CRITICO">Inspeção de ponto crítico</option></select></label>
-              <label>Data<input name="data" type="date" required></label>
-              <label>Turno<select name="turno" required><option value="MANHA">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option></select></label>
-              <label>Especialidade<select name="especialidade" required><option value="DRENAGEM">Drenagem</option><option value="VISTORIA">Vistoria</option><option value="DESOBSTRUCAO">Desobstrução</option><option value="GERAL">Geral</option></select></label>
-              <label>Categoria do recurso<select name="categoriaRecurso" required><option value="CAMINHAO_HIDROJATO">Caminhão hidrojato</option><option value="KIT_VISTORIA">Kit de vistoria</option><option value="RETROESCAVADEIRA">Retroescavadeira</option><option value="CAMINHONETE">Caminhonete</option><option value="BOMBA_SUCCAO">Bomba de sucção</option></select></label>
-              <label class="wide-field">Descrição (opcional)<textarea name="descricao" maxlength="500" rows="3" placeholder="Informação útil para a equipe"></textarea></label>
-            </div><button class="button button-primary" type="submit">Enviar solicitação</button><p class="form-hint">O serviço de Operações responde com o estado real da solicitação e da SAGA.</p>
-          </form>
-          <article class="panel-card saga-card"><div class="card-heading"><div><p class="eyebrow">ACOMPANHAMENTO</p><h3>Ação e SAGA</h3></div><span class="status-tag" id="saga-state">Aguardando solicitação</span></div><div id="saga-detail" class="data-block"><p class="muted">Depois de enviar uma solicitação, o painel consulta o estado publicado por Operações.</p></div><button class="button button-light" id="check-saga-button" type="button" hidden>Consultar agora</button></article>
+        <div class="sidenav-panel" id="sidenav-panel">
+          <nav aria-label="Telas do painel">
+            <ul class="nav-list">
+              <li><a class="nav-item" id="nav-visao-geral" href="#/visao-geral">Visão geral</a></li>
+              <li><a class="nav-item" id="nav-sinalizacoes" href="#/sinalizacoes">Sinalizações</a></li>
+              <li><a class="nav-item" id="nav-acoes" href="#/acoes">Ações</a></li>
+              <li><a class="nav-item" id="nav-assistente" href="#/assistente">Assistente</a></li>
+            </ul>
+          </nav>
+          <div class="account" id="account" aria-live="polite">
+            <span class="account-identity" id="identity">Acesso da equipe</span>
+            <button class="button button-outline" id="login-button" type="button">Entrar com Keycloak</button>
+            <button class="button button-outline" id="logout-button" type="button" hidden>Sair</button>
+          </div>
         </div>
-      </section>
+      </aside>
 
-      <section class="section-block knowledge-section" aria-labelledby="knowledge-title"><div class="section-heading"><div><p class="eyebrow">BASE DE CONHECIMENTO</p><h2 id="knowledge-title">Pergunte à Análise</h2></div></div>
-        <form class="panel-card question-card" id="question-form"><label for="question">Pergunta sobre prevenção e resposta</label><div class="question-row"><input id="question" name="pergunta" type="text" minlength="5" maxlength="1000" placeholder="Ex.: Quais cuidados são recomendados antes de uma chuva intensa?" required><button class="button button-primary" type="submit" disabled>Consultar</button></div><div id="answer" class="answer-block" aria-live="polite"><p class="muted">A resposta e os trechos de referência serão fornecidos pelo serviço Análise.</p></div></form>
-      </section>
-      <footer><span>PLUVIA · Sistemas Distribuídos · UFLA</span><span>Informação de apoio, não substitui os canais oficiais.</span></footer>
-    </main>
+      <main class="content" id="conteudo">
+        <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+
+        <section class="screen" id="screen-visao-geral" aria-labelledby="title-visao-geral">
+          <header class="screen-header"><p class="eyebrow">LAVRAS, MG</p><h1 id="title-visao-geral">Visão geral</h1></header>
+          <div class="screen-body" id="body-visao-geral" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
+        </section>
+
+        <section class="screen" id="screen-sinalizacoes" aria-labelledby="title-sinalizacoes" hidden>
+          <header class="screen-header"><p class="eyebrow">RISCO</p><h1 id="title-sinalizacoes">Sinalizações</h1></header>
+          <div class="screen-body" id="body-sinalizacoes" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
+        </section>
+
+        <section class="screen" id="screen-acoes" aria-labelledby="title-acoes" hidden>
+          <header class="screen-header"><p class="eyebrow">OPERAÇÕES</p><h1 id="title-acoes">Ações</h1></header>
+          <div class="screen-body" id="body-acoes" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
+        </section>
+
+        <section class="screen" id="screen-assistente" aria-labelledby="title-assistente" hidden>
+          <header class="screen-header"><p class="eyebrow">ANÁLISE</p><h1 id="title-assistente">Assistente</h1></header>
+          <div class="screen-body" id="body-assistente" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
+        </section>
+
+        <footer class="site-footer"><span>PLUVIA · Sistemas Distribuídos · UFLA</span><span>Informação de apoio, não substitui os canais oficiais.</span></footer>
+      </main>
+    </div>
   </body>
 </html>

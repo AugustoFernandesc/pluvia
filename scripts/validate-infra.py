@@ -232,6 +232,7 @@ def validate_clients() -> None:
         web / "app.js",
         web / "styles.css",
         web / "details.css",
+        web / "logo.png",
         web / "nginx.conf",
         web / "Dockerfile",
         mobile / "index.html",
@@ -277,7 +278,8 @@ def validate_clients() -> None:
         "grant_type: 'authorization_code'",
         "code_verifier: verifier",
         "post_logout_redirect_uri: REDIRECT_URI",
-        "state.roles.includes('GESTOR')",
+        "temPerfil('GESTOR')",
+        "temPerfil('TECNICO')",
         "'/web/v1/painel",
         "'/web/v1/consultas'",
     ):
@@ -285,7 +287,10 @@ def validate_clients() -> None:
             fail(f"Painel Web não implementa o requisito do fluxo de navegador: {marker}.")
     if "client_secret" in web_script.lower():
         fail("O cliente público Web não pode conter um client secret.")
-    if not all(marker in web_html for marker in ('id="login-button"', 'id="action-form"', 'id="question-form"')):
+    # Os formulários são criados pelo app.js (cada tela desenha o seu corpo); só o login fica no HTML.
+    if 'id="login-button"' not in web_html or not all(
+        marker in web_script for marker in ("form.id = 'action-form'", "form.id = 'question-form'")
+    ):
         fail("Painel Web precisa exibir autenticação, ação preventiva e consulta à Análise.")
     for marker in (
         "http://localhost:8000",
