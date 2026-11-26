@@ -76,7 +76,7 @@ docker compose logs --tail=150 kong bff-web bff-mobile territorio risco operacoe
 docker compose logs --tail=100 territorio-db risco-escrita-db risco-leitura-db
 ```
 
-Uma API de domínio que responda com `application/problem+json` mantém seu status e corpo no BFF. Falha de conexão vira `503 problem+json`; timeout upstream vira `504 problem+json`. Para restaurar os containers após corrigir configuração:
+Uma API de domínio que responda com `application/problem+json` mantém seu status e corpo no BFF. Falha de conexão vira `503 problem+json`; timeout upstream normalmente vira `504 problem+json`. No resumo público Mobile, timeout de Território ou Risco também vira `503`, pois ambos são essenciais para produzir uma resposta confiável. Para restaurar os containers após corrigir configuração:
 
 ```bash
 docker compose up -d --build

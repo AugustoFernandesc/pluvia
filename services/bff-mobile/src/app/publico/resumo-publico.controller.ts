@@ -24,6 +24,16 @@ export class ResumoPublicoController {
       this.servicos.requisitar('RISCO', `v1/panoramas/${regiaoId}`, request),
     ]);
     const falha = [territorio, risco].find((item) => item.status < 200 || item.status >= 300);
+    if (falha?.status === 504) {
+      return problemaInterno(
+        response,
+        503,
+        'Resumo temporariamente indisponível',
+        'Território ou Risco não respondeu a tempo. Tente novamente mais tarde.',
+        request.path,
+        request.header('x-request-id'),
+      );
+    }
     if (falha) return this.enviar(request, response, falha);
 
     const regiao = jsonInterno<RegiaoTerritorio>(territorio);

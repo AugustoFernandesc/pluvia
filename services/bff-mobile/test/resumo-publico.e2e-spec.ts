@@ -60,6 +60,28 @@ describe('BFF Mobile: resumo público com dados de Território e Risco', () => {
     expect(privateRoute.status).toBe(401);
   });
 
+  it('conserva 503 no resumo público quando uma dependência essencial estoura o timeout', async () => {
+    fetchMock.mockImplementation((input: URL | RequestInfo) => {
+      const url = String(input);
+      if (url.startsWith('http://127.0.0.1:')) return fetchReal(input);
+      if (url.startsWith('http://territorio:3000/')) {
+        return Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
+      }
+      if (url.startsWith('http://risco:3000/')) {
+        return Promise.resolve(new Response(JSON.stringify({ regiaoId, nivelAtencao: 'ATENCAO' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }));
+      }
+      throw new Error(`URL inesperada: ${url}`);
+    });
+
+    const resumo = await request(context.app.getHttpServer()).get(`/mobile/v1/publico/regioes/${regiaoId}/resumo`);
+    expect(resumo.status).toBe(503);
+    expect(resumo.headers['content-type']).toContain('application/problem+json');
+    expect(resumo.body.status).toBe(503);
+  });
+
   it('devolve 502 se os dados reais não sustentam um resumo público', async () => {
     fetchMock.mockImplementation(async (input: URL | RequestInfo) => {
       const url = String(input);
