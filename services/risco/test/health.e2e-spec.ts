@@ -66,6 +66,13 @@ describe('GET /health (e2e)', () => {
 
     definirAmbiente('ESCRITA', escrita.banco);
     definirAmbiente('LEITURA', leitura.banco);
+    // Este teste não precisa do RabbitMQ: o publicador e o projetor só tentam
+    // conectar em segundo plano, e o /health não depende deles.
+    process.env.RABBITMQ_HOST = '127.0.0.1';
+    process.env.RABBITMQ_PORT = String(await obterPortaLivre());
+    process.env.RABBITMQ_VHOST = 'pluvia';
+    process.env.RABBITMQ_USER = 'guest';
+    process.env.RABBITMQ_PASSWORD = 'guest';
     process.env.PORT = '3000';
 
     // O ConfigModule valida o ambiente ao carregar o módulo, então o AppModule

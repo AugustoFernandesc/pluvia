@@ -50,11 +50,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Verificar sintaxe dos scripts Python
         run: python -m py_compile scripts/prepare-ci-env.py scripts/validate-infra.py scripts/ci_integration.py infra/kong/bootstrap-kong.py
+      - name: Verificar sintaxe dos clientes sem dependências de build
+        run: node --check clients/web/app.js && node --check clients/mobile/app.js
+      - name: Testes funcionais dos clientes no DOM simulado
+        run: node --test scripts/test-clients.test.cjs
       - name: Instalar validador YAML
         run: python -m pip install PyYAML==6.0.3
       - name: Testes do servico Analise
@@ -114,7 +121,12 @@ jobs:
       - name: Construir e iniciar apenas a infraestrutura deste escopo
         run: |
           compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
-          "${compose[@]}" build bff-web bff-mobile keycloak kong analise risco
+          "${compose[@]}" build bff-web bff-mobile keycloak kong analise risco territorio operacoes equipes frota rabbitmq pluvia-web pluvia-mobile
+          "${compose[@]}" up -d --wait rabbitmq territorio risco
+          "${compose[@]}" up -d --wait operacoes equipes frota
+          "${compose[@]}" up -d --wait analise-db
+          # Análise uses its real data-source tools and fallback; do not pull multi-GB Ollama models in CI.
+          "${compose[@]}" up -d --wait --no-deps analise
           "${compose[@]}" up -d --wait bff-web bff-mobile keycloak-db keycloak
           # kong-config is a one-shot service. Let Kong's service_completed_successfully
           # dependency run it, and poll the public endpoint instead of --wait on it.
@@ -131,6 +143,9 @@ jobs:
             echo "Keycloak metadata did not become reachable through Kong." >&2
             exit 1
           fi
+          "${compose[@]}" up -d --wait pluvia-web pluvia-mobile
+          curl --fail http://127.0.0.1:5173/ > /dev/null
+          curl --fail http://127.0.0.1:5174/ > /dev/null
       - name: Diagnosticar falha Docker, Keycloak ou Kong
         if: failure()
         run: |
@@ -145,6 +160,17 @@ jobs:
           --keycloak-url http://127.0.0.1:18080
           --gateway-url http://127.0.0.1:8000
           --issuer http://localhost:8000/auth/realms/pluvia
+      - name: Comprovar 503 após indisponibilidade real de Território
+        run: |
+          compose=(docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml)
+          "${compose[@]}" stop territorio
+          "${compose[@]}" rm --force territorio
+          python scripts/ci_integration.py \
+            --secret-env-file infra/keycloak/.env \
+            --keycloak-url http://127.0.0.1:18080 \
+            --gateway-url http://127.0.0.1:8000 \
+            --issuer http://localhost:8000/auth/realms/pluvia \
+            --check-mobile-unavailable
       - name: Remover containers e volumes efêmeros
         if: always()
         run: docker compose -f docker-compose.yml -f .github/docker-compose-ci.override.yaml down --volumes --remove-orphans
@@ -281,7 +307,8 @@ jobs:
             --keycloak-url http://127.0.0.1:18081 \
             --gateway-url http://127.0.0.1:18080 \
             --host-header pluvia.local \
-            --issuer http://pluvia.local/auth/realms/pluvia
+            --issuer http://pluvia.local/auth/realms/pluvia \
+            --skip-domain-integration
       - name: Diagnosticar falha Kubernetes, Kind ou Traefik
         if: failure()
         run: |

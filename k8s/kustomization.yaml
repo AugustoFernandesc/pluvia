@@ -19,6 +19,7 @@ resources:
   - kong
   - ingress
   - risco
+  - ollama
   - analise
   - operacoes
   - equipes

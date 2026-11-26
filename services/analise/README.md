@@ -31,6 +31,32 @@ As rotas da API (`/v1/analises`, `/v1/consultas`...) entram no router `v1` de `a
 | `POSTGRES_PASSWORD` | `.env` | senha (idem) |
 | `PORT` | `environment` | porta HTTP, **8000** |
 
+## `POST /v1/analises`: chain com tools
+
+Entrada `{ "regiaoId": "<uuid>", "tipo": "SITUACAO_ATUAL" | "CENARIO_PREVISTO" }`. Saída com `sintese`, `fontes`, `origem` (`LLM` ou `FALLBACK`), `modelo` e `latenciaMs`. Código em `app/analises.py`.
+
+Duas tools (`@tool` do `langchain_core`) consultam dados reais do Pluvia por HTTP:
+
+| Tool | Chama | Devolve |
+|---|---|---|
+| `consultar_regiao(regiao_id)` | `GET {TERRITORIO_URL}/v1/regioes/{id}` | nome, município, características (área, curso d'água, declividade, ocupação) |
+| `consultar_risco(regiao_id)` | `GET {RISCO_URL}/v1/panoramas/{id}` | nível de atenção, sinalizações abertas, fatores |
+
+Se o serviço não responde, responde fora de 200 ou não tem a região, a tool devolve `dado indisponível` em vez de levantar erro.
+
+A chain é fixa: `prompt | modelo com as tools` → executa as tool calls → devolve os resultados como `ToolMessage` → o modelo escreve a síntese. As duas chamadas ao modelo passam por `ClienteLLM.executar`, com circuit breaker, timeout e retry. A tool sempre consulta a região da requisição, e não o id que o modelo escreveu no argumento. Se o modelo não pedir uma das tools, ela roda mesmo assim e o resultado entra como dado adicional.
+
+**Por que não um agente:** o fluxo não tem decisão dinâmica. São sempre as mesmas duas consultas, seguidas da síntese.
+
+**Fallback:** com o modelo indisponível (`LLMIndisponivel`), a síntese é montada por regra com os dados das tools, e a resposta sai com `origem: "FALLBACK"` e `modelo: null`. Para ver ao vivo: `docker compose stop ollama`.
+
+| Variável | Origem | Uso |
+|---|---|---|
+| `TERRITORIO_URL`, `RISCO_URL` | `llm.env` | endereço dos serviços consultados pelas tools |
+| `FONTES_TIMEOUT_S` | `llm.env` | timeout de cada consulta |
+
+`tests/test_analises.py` roda as tools contra um servidor HTTP falso (stdlib, numa thread) que responde de verdade, e a análise com o Ollama apontando para uma porta fechada, para cair no fallback.
+
 ## `GET /health`
 
 Mesmo formato do Terminus usado nos serviços NestJS. Responde 200 só se o banco responde **e** a extensão `vector` está instalada:

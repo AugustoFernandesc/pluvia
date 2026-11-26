@@ -1,0 +1,27 @@
+[
+  {
+    "pergunta": "Qual percentil padrão faz uma região entrar no nível ATENCAO no Pluvia, e com qual janela de chuva?",
+    "fatos": ["85", "72 horas"]
+  },
+  {
+    "pergunta": "O que a equipe da prefeitura deve fazer quando uma região está em ALTA_ATENCAO?",
+    "fatos": ["prontidão", "Defesa Civil"]
+  },
+  {
+    "pergunta": "Por que uma ação preventiva no estado PENDENTE não pode ser cancelada?",
+    "fatos": ["reserva", "equipe"]
+  },
+  {
+    "pergunta": "Quantas ocorrências de alagamento, enxurrada e inundação Lavras registrou entre 1991 e 2025, e quantas pessoas foram afetadas?",
+    "fatos": ["11", "3.077"]
+  },
+  {
+    "pergunta": "Quais cuidados tomar ao limpar a casa depois de um alagamento?",
+    "fatos": ["luvas", "leptospirose"]
+  },
+  {
+    "pergunta": "Qual é a melhor época para plantar café no sul de Minas?",
+    "fatos": ["não cobre"],
+    "foraDoEscopo": true
+  }
+]

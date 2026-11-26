@@ -22,7 +22,9 @@ O container escuta na porta 3000 e roda como usuário sem privilégios. O Docker
 - `GET /mobile/v1/publico/_system/status`: verificação técnica pública.
 - `GET /mobile/v1/_system/authorization-check`: verificação técnica exclusiva de `AGENTE`.
 
-As rotas `_system` servem aos testes de autenticação e não implementam os contratos de negócio em `docs/api/bff-mobile.yaml`.
+O fluxo público implementa `GET /mobile/v1/publico/regioes` (catálogo sem geometria) e `GET /mobile/v1/publico/regioes/{id}/resumo`. A lista vem de Território; o resumo combina nome e nível/data reais de Território e Risco. Sem nível ou data confiável, responde `502`; sem uma dependência essencial, responde `503` em `application/problem+json`. O resumo envia `ETag` e aceita `If-None-Match`.
+
+Os endereços internos usam `TERRITORIO_URL` e `RISCO_URL`, com timeout configurável. Rotas públicas não usam JWT; rotas privadas continuam protegidas pelos guards atuais.
 
 ## Autenticação
 

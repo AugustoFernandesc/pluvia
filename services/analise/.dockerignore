@@ -13,3 +13,6 @@ Dockerfile
 compose.yaml
 *.md
 requirements-dev.txt
+
+# A base de conhecimento é indexada pelo serviço.
+!conhecimento/*.md

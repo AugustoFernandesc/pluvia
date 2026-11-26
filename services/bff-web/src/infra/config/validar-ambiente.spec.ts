@@ -10,7 +10,17 @@ const completo: Record<string, string> = {
 
 describe('validarAmbiente', () => {
   it('aceita a configuração completa e converte a porta', () => {
-    expect(validarAmbiente(completo)).toEqual({ ...completo, PORT: 3000 });
+    expect(validarAmbiente(completo)).toEqual({
+      ...completo,
+      PORT: 3000,
+      TERRITORIO_URL: 'http://territorio:3000',
+      OPERACOES_URL: 'http://operacoes:3000',
+      RISCO_URL: 'http://risco:3000',
+      ANALISE_URL: 'http://analise:8000',
+      UPSTREAM_TIMEOUT_MS: 2_000,
+      ANALISE_TIMEOUT_MS: 120_000,
+      ANALISE_SINTESE_TIMEOUT_MS: 30_000,
+    });
   });
 
   it.each(Object.keys(completo))('exige %s', (nome) => {
@@ -25,6 +35,25 @@ describe('validarAmbiente', () => {
   it('rejeita issuer que não seja uma URL HTTP(S)', () => {
     expect(() => validarAmbiente({ ...completo, KEYCLOAK_ISSUER: 'pluvia' })).toThrow(
       'KEYCLOAK_ISSUER',
+    );
+  });
+
+  it('valida e preserva os destinos internos configurados por ambiente', () => {
+    expect(
+      validarAmbiente({
+        ...completo,
+        TERRITORIO_URL: 'http://territorio.local:3001',
+        UPSTREAM_TIMEOUT_MS: '1500',
+      }),
+    ).toMatchObject({ TERRITORIO_URL: 'http://territorio.local:3001', UPSTREAM_TIMEOUT_MS: 1500 });
+    expect(() => validarAmbiente({ ...completo, RISCO_URL: 'http://user:secret@risco:3000' })).toThrow(
+      'RISCO_URL',
+    );
+    expect(() => validarAmbiente({ ...completo, ANALISE_TIMEOUT_MS: '0' })).toThrow(
+      'ANALISE_TIMEOUT_MS',
+    );
+    expect(() => validarAmbiente({ ...completo, ANALISE_SINTESE_TIMEOUT_MS: '0' })).toThrow(
+      'ANALISE_SINTESE_TIMEOUT_MS',
     );
   });
 });

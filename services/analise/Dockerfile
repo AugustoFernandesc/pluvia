@@ -15,6 +15,8 @@ RUN useradd --system --uid 10001 --no-create-home analise
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 COPY app ./app
+COPY conhecimento ./conhecimento
+COPY avaliacao ./avaliacao
 USER analise
 EXPOSE 8000
 CMD ["python", "-m", "app"]

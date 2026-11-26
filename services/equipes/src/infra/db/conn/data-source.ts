@@ -1,7 +1,7 @@
-import { join } from 'path';
-import { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSourceOptions } from 'typeorm';
 
 import { Ambiente } from '@infra/config/validar-ambiente';
+import { CriaEquipesEReservas1764200000000 } from '@infra/db/migrations/1764200000000-CriaEquipesEReservas';
 
 export function criarOpcoesDoBanco(
   ambiente: Pick<
@@ -21,7 +21,9 @@ export function criarOpcoesDoBanco(
     username: ambiente.POSTGRES_USER,
     password: ambiente.POSTGRES_PASSWORD,
     synchronize: false,
-    entities: [join(__dirname, '..', 'repositories', '**', '*.schema.js')],
-    migrations: [join(__dirname, '..', 'migrations', '*.js')],
+    migrationsRun: true,
+    // Os repositórios usam SQL direto, sem entidades mapeadas.
+    entities: [],
+    migrations: [CriaEquipesEReservas1764200000000],
   };
 }

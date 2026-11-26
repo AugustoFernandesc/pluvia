@@ -26,6 +26,19 @@ spec:
                 name: equipes-config
             - secretRef:
                 name: equipes-secret
+          # Usuário e senha do RabbitMQ vêm do Secret do próprio broker, para
+          # não existir uma segunda cópia da senha que possa ficar diferente.
+          env:
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_SERVICOS_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_SERVICOS_PASSWORD
           readinessProbe:
             httpGet:
               path: /health

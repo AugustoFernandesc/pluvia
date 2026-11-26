@@ -10,7 +10,13 @@ const completo: Record<string, string> = {
 
 describe('validarAmbiente', () => {
   it('aceita a configuração completa e converte a porta', () => {
-    expect(validarAmbiente(completo)).toEqual({ ...completo, PORT: 3000 });
+    expect(validarAmbiente(completo)).toEqual({
+      ...completo,
+      PORT: 3000,
+      TERRITORIO_URL: 'http://territorio:3000',
+      RISCO_URL: 'http://risco:3000',
+      UPSTREAM_TIMEOUT_MS: 2_000,
+    });
   });
 
   it.each(Object.keys(completo))('exige %s', (nome) => {
@@ -25,6 +31,18 @@ describe('validarAmbiente', () => {
   it('rejeita issuer que não seja uma URL HTTP(S)', () => {
     expect(() => validarAmbiente({ ...completo, KEYCLOAK_ISSUER: 'pluvia' })).toThrow(
       'KEYCLOAK_ISSUER',
+    );
+  });
+
+  it('valida destinos e timeout configurados por ambiente', () => {
+    expect(
+      validarAmbiente({ ...completo, RISCO_URL: 'http://risco.local:3100', UPSTREAM_TIMEOUT_MS: '1500' }),
+    ).toMatchObject({ RISCO_URL: 'http://risco.local:3100', UPSTREAM_TIMEOUT_MS: 1500 });
+    expect(() => validarAmbiente({ ...completo, TERRITORIO_URL: 'javascript:alert(1)' })).toThrow(
+      'TERRITORIO_URL',
+    );
+    expect(() => validarAmbiente({ ...completo, UPSTREAM_TIMEOUT_MS: '-1' })).toThrow(
+      'UPSTREAM_TIMEOUT_MS',
     );
   });
 });

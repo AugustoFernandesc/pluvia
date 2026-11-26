@@ -2,6 +2,7 @@
 """Static consistency checks for Compose, Kong, BFF and Kubernetes files."""
 
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -69,6 +70,7 @@ def validate_kong() -> None:
         "bff-web": "http://bff-web:3000",
         "bff-mobile": "http://bff-mobile:3000",
         "keycloak": "http://keycloak:8080",
+        "keycloak-recursos": "http://keycloak:8080/resources",
     }:
         fail("Kong deve encaminhar apenas para os dois BFFs e o Keycloak.")
 
@@ -222,6 +224,84 @@ def validate_bffs() -> None:
             fail("BFF Mobile não configura /mobile/v1.")
 
 
+def validate_clients() -> None:
+    web = ROOT / "clients" / "web"
+    mobile = ROOT / "clients" / "mobile"
+    required_files = (
+        web / "index.html",
+        web / "app.js",
+        web / "styles.css",
+        web / "details.css",
+        web / "nginx.conf",
+        web / "Dockerfile",
+        mobile / "index.html",
+        mobile / "app.js",
+        mobile / "styles.css",
+        mobile / "nginx.conf",
+        mobile / "Dockerfile",
+    )
+    if any(not path.is_file() for path in required_files):
+        fail("Os clientes Web e Mobile precisam conter páginas, scripts, estilos, Nginx e Dockerfiles.")
+        return
+
+    realm = json.loads(
+        (ROOT / "infra" / "keycloak" / "realm" / "pluvia-realm.json").read_text(encoding="utf-8")
+    )
+    cliente_web = next(
+        (client for client in realm.get("clients", []) if client.get("clientId") == "pluvia-web"),
+        {},
+    )
+    if (
+        cliente_web.get("publicClient") is not True
+        or cliente_web.get("standardFlowEnabled") is not True
+        or "http://localhost:5173/*" not in cliente_web.get("redirectUris", [])
+        or "http://localhost:5173" not in cliente_web.get("webOrigins", [])
+        or cliente_web.get("attributes", {}).get("pkce.code.challenge.method") != "S256"
+    ):
+        fail("Keycloak deve permitir o cliente Web público com redirect local e PKCE S256.")
+
+    # Every local file the page loads must be copied into the Nginx image.
+    for client in (web, mobile):
+        page = (client / "index.html").read_text(encoding="utf-8")
+        copied = (client / "Dockerfile").read_text(encoding="utf-8")
+        for asset in re.findall(r'(?:href|src)="/([\w.-]+\.(?:css|js))"', page):
+            if asset not in copied:
+                fail(f"{client.name}/Dockerfile não copia {asset}, carregado pelo index.html.")
+
+    web_script = (web / "app.js").read_text(encoding="utf-8")
+    web_html = (web / "index.html").read_text(encoding="utf-8")
+    mobile_script = (mobile / "app.js").read_text(encoding="utf-8")
+    mobile_html = (mobile / "index.html").read_text(encoding="utf-8")
+    for marker in (
+        "code_challenge_method: 'S256'",
+        "grant_type: 'authorization_code'",
+        "code_verifier: verifier",
+        "post_logout_redirect_uri: REDIRECT_URI",
+        "state.roles.includes('GESTOR')",
+        "'/web/v1/painel",
+        "'/web/v1/consultas'",
+    ):
+        if marker not in web_script:
+            fail(f"Painel Web não implementa o requisito do fluxo de navegador: {marker}.")
+    if "client_secret" in web_script.lower():
+        fail("O cliente público Web não pode conter um client secret.")
+    if not all(marker in web_html for marker in ('id="login-button"', 'id="action-form"', 'id="question-form"')):
+        fail("Painel Web precisa exibir autenticação, ação preventiva e consulta à Análise.")
+    for marker in (
+        "http://localhost:8000",
+        "/mobile/v1/publico/regioes?municipio=Lavras",
+        "/resumo",
+        "If-None-Match",
+        "credentials: 'omit'",
+    ):
+        if marker not in mobile_script:
+            fail(f"Cliente Mobile não implementa a consulta pública pelo gateway: {marker}.")
+    if "authorization" in mobile_script.lower() or "territorio:3000" in mobile_script.lower():
+        fail("Cliente Mobile não deve enviar identidade nem chamar serviços internos diretamente.")
+    if not all(marker in mobile_html for marker in ('id="region-select"', 'id="loading-state"', 'id="empty-state"')):
+        fail("Cliente Mobile precisa exibir seleção, carregamento e estado vazio.")
+
+
 def validate_kubernetes() -> None:
     root = load_yaml(ROOT / "k8s" / "kustomization.yaml")
     expected = {
@@ -284,6 +364,20 @@ def validate_kubernetes() -> None:
                     f"Keycloak client {client.get('clientId')} referencia scopes não declarados: "
                     f"{', '.join(sorted(missing_scopes))}."
                 )
+        # Keycloak 25+ only emits the sub claim through the basic scope; the BFFs
+        # reject tokens without sub.
+        basic_has_sub = any(
+            mapper.get("protocolMapper") == "oidc-sub-mapper"
+            and mapper.get("config", {}).get("access.token.claim") == "true"
+            for mapper in client_scopes.get("basic", {}).get("protocolMappers", [])
+        )
+        if not basic_has_sub:
+            fail("Keycloak precisa declarar o scope basic com o mapper de sub no access token.")
+        for client in realm_config.get("clients", []):
+            if client.get("clientId") in {"pluvia-web", "pluvia-mobile"} and "basic" not in client.get(
+                "defaultClientScopes", []
+            ):
+                fail(f"O cliente {client.get('clientId')} precisa do scope basic para receber o sub.")
         roles_scope = client_scopes.get("roles", {})
         realm_roles_mapper = any(
             mapper.get("protocolMapper") == "oidc-usermodel-realm-role-mapper"
@@ -317,6 +411,8 @@ def validate_compose_root() -> None:
     expected = {
         "services/bff-web/compose.yaml",
         "services/bff-mobile/compose.yaml",
+        "clients/web/compose.yaml",
+        "clients/mobile/compose.yaml",
         "infra/keycloak/compose.yaml",
         "infra/kong/compose.yaml",
         "services/analise/compose.yaml",
@@ -515,6 +611,7 @@ def main() -> int:
     validate_syntax()
     validate_kong()
     validate_bffs()
+    validate_clients()
     validate_kubernetes()
     validate_compose_root()
     validate_ci_workflow()
