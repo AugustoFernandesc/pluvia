@@ -215,4 +215,24 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
       .post(`/web/v1/sinalizacoes/${sinalizacaoId}/reconhecimento`)
       .set('Authorization', `Bearer ${agente}`)).status).toBe(403);
   });
+
+  it('lista as sinalizações repassando o filtro ao modelo de escrita do Risco', async () => {
+    const tecnico = await context.signToken(['TECNICO']);
+    fetchMock.mockImplementation((input: URL | RequestInfo) => String(input).startsWith('http://127.0.0.1:')
+      ? fetchReal(input)
+      : Promise.resolve(new Response('{"itens":[],"pagina":1,"tamanho":20,"total":0}', { status: 200, headers: { 'content-type': 'application/json' } })));
+
+    const response = await request(context.app.getHttpServer())
+      .get('/web/v1/sinalizacoes?estado=ABERTA')
+      .set('Authorization', `Bearer ${tecnico}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(0);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === 'http://risco:3000/v1/sinalizacoes?estado=ABERTA')).toBe(true);
+
+    const agente = await context.signToken(['AGENTE']);
+    expect((await request(context.app.getHttpServer())
+      .get('/web/v1/sinalizacoes')
+      .set('Authorization', `Bearer ${agente}`)).status).toBe(403);
+  });
 });
