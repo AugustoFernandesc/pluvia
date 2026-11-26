@@ -123,6 +123,23 @@ paths:
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
+  /acoes/{acaoId}/saga:
+    get:
+      tags: [Acoes]
+      operationId: obterSagaWeb
+      summary: Consulta o estado real da SAGA de uma ação. Exclusivo do papel GESTOR
+      parameters:
+        - { name: acaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Estado da SAGA retornado por Operações
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
   /acoes/{acaoId}/cancelamento:
     post:
       tags: [Acoes]
@@ -163,6 +180,32 @@ paths:
             application/json:
               schema: { type: object }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /consultas:
+    post:
+      tags: [Painel]
+      operationId: consultarConhecimentoWeb
+      summary: Pergunta à base de conhecimento da Análise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pergunta]
+              properties:
+                pergunta: { type: string, minLength: 5, maxLength: 1000 }
+                regiaoId: { type: string, format: uuid }
+                usarRecuperacao: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Resposta e trechos retornados por Análise
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
 
   /sinalizacoes/{sinalizacaoId}/reconhecimento:
     post:
@@ -300,7 +343,7 @@ components:
               additionalProperties: { type: integer }
               example: { NORMAL: 9, OBSERVACAO: 3, ATENCAO: 2, ALTA_ATENCAO: 0 }
             sinalizacoesAbertas: { type: integer }
-            acoesEmAndamento: { type: integer }
+            acoesEmAndamento: { type: integer, nullable: true, description: Nulo enquanto Operações não disponibilizar a consulta }
         regioes:
           type: array
           items:
@@ -310,9 +353,10 @@ components:
               nome: { type: string }
               nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
               sinalizacoesAbertas: { type: integer }
-              acoesAbertas: { type: integer }
+              acoesAbertas: { type: integer, nullable: true, description: Nulo enquanto Operações não disponibilizar a consulta }
               atualizadoEm: { type: string, format: date-time }
         atualizadoEm: { type: string, format: date-time }
+        avisos: { type: array, items: { type: string }, description: Dependências indisponíveis ou ainda não implementadas }
 
     DetalheRegiao:
       type: object
@@ -322,8 +366,8 @@ components:
         regiao: { type: object, description: 'Região com geometria, de Território' }
         panorama: { type: object, description: 'Panorama completo, de Risco' }
         cenarioPrevisto: { type: object, nullable: true, description: De Risco }
-        vulnerabilidade: { type: object, description: De Território }
-        ocorrenciasRecentes: { type: array, items: { type: object }, description: De Território }
+        vulnerabilidade: { type: object, nullable: true, description: De Território; nulo quando indisponível }
+        ocorrenciasRecentes: { type: array, nullable: true, items: { type: object }, description: De Território; nulo quando indisponível }
         acoes:
           type: object
           nullable: true
@@ -334,10 +378,19 @@ components:
         analise:
           type: object
           nullable: true
-          description: De Análise. Nulo se a Análise não responder a tempo
+          description: Síntese real de Análise. Nulo se a dependência responder com erro
           properties:
             sintese: { type: string }
             origem: { type: string, enum: [LLM, CACHE, FALLBACK] }
+            fontes:
+              type: array
+              items:
+                type: object
+                properties:
+                  nome: { type: string }
+                  referencia: { type: string }
+            modelo: { type: string, nullable: true }
+            latenciaMs: { type: integer, nullable: true }
             geradaEm: { type: string, format: date-time }
         avisos:
           type: array

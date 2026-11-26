@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#133a40">
+    <title>Pluvia · Minha região</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="phone-shell">
+      <header class="app-header"><a class="brand" href="/" aria-label="Pluvia, início"><span class="brand-icon" aria-hidden="true">P</span><span>pluvia<span class="dot">.</span></span></a><span class="public-label"><span class="public-dot"></span>consulta pública</span></header>
+      <section class="welcome"><p class="eyebrow">INFORMAÇÃO PARA A COMUNIDADE</p><h1>Como está a sua região?</h1><p>Consulte o panorama mais recente disponível para Lavras.</p></section>
+      <section class="selector-card" aria-labelledby="selector-title"><label id="selector-title" for="region-select">Escolha uma região</label><select id="region-select" disabled><option>Carregando regiões…</option></select><p id="region-help" class="helper">A consulta é pública e não exige login.</p></section>
+      <div class="message" id="message" role="status" aria-live="polite" hidden></div>
+      <section class="summary-card" id="summary" aria-live="polite" aria-busy="false">
+        <div class="empty-state" id="empty-state"><span class="rain-icon" aria-hidden="true">◌</span><h2>Seu resumo aparece aqui</h2><p>Selecione uma região para consultar os dados disponíveis.</p></div>
+        <div class="loading-state" id="loading-state" hidden><span class="spinner" aria-hidden="true"></span><p>Buscando dados mais recentes…</p></div>
+        <div class="summary-content" id="summary-content" hidden><div class="summary-top"><div><p class="eyebrow">PANORAMA DA REGIÃO</p><h2 id="region-name">—</h2></div><span class="level-mark" id="level-mark" aria-hidden="true">●</span></div><div class="attention-level" id="attention-level">—</div><p class="summary-message" id="summary-message"></p><div class="updated"><span class="updated-icon" aria-hidden="true">↻</span><span>Atualizado em <time id="updated-at">—</time></span></div><p class="disclaimer">Este panorama é informativo e não representa alerta oficial. Em uma emergência, siga os canais e orientações da Defesa Civil.</p></div>
+      </section>
+      <footer><span class="footer-mark">P</span><span>Pluvia · Lavras, MG<br><small>Acompanhamento territorial</small></span></footer>
+    </main>
+  </body>
+</html>
