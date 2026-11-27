@@ -70,6 +70,8 @@ Se a tela crescer, quebre em mais arquivos dentro da pasta dela. O que for usado
 
 - **Linguagem de produto.** UUID, caminho de API, nome de enum, origem da resposta (`CACHE`, `FALLBACK`), latência e nome de mensagem só aparecem dentro de `<Bastidores>`.
 - **Nenhuma tela espera a IA.** Os dados aparecem primeiro; a síntese vem numa consulta separada, com o próprio `EstadoTela`.
+- **MUI para os componentes.** Botão, campo, tabela, aba, alerta, diálogo e ícone vêm do MUI. Biblioteca visual nova pode entrar, mas só com motivo e avisando o grupo antes: cada uma pesa no carregamento. A Visão geral usa o Leaflet porque o mapa é o centro da tela.
+- **Coerência visual.** A tela tem liberdade de arranjo, mas segue a Visão geral em cartões, espaçamentos e estados. Detalhes em `docs/parte4/telas/README.md`.
 - **Cores só do tema.** Use `cores` de `tema.ts`, `ChipNivel` e `ChipEstado`; nada de hex na tela.
 - **Rótulos.** Nível e estado passam por `rotuloNivel` e `rotuloEstado`.
 - **Erros.** Falha ao carregar aparece no `EstadoTela`. Falha numa ação do usuário (salvar, reconhecer) aparece num `Alert` na própria tela, com `mensagemErro(erro)`.
