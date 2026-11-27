@@ -530,7 +530,7 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 | Mensageria | RabbitMQ, com plugin MQTT |
 | Gateway | Kong |
 | Identidade | Keycloak |
-| Clientes da Parte 4 | Painel Web e consulta pública Mobile em HTML, CSS e JavaScript, servidos por Nginx |
+| Clientes da Parte 4 | Painel Web em React, Vite, TypeScript e MUI ([como criar uma tela](clients/web/README.md)); consulta pública Mobile em HTML, CSS e JavaScript. Ambos servidos por Nginx |
 
 ---
 

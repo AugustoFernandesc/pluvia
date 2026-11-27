@@ -1,64 +1,14 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#083461">
-    <title>Pluvia · Visão geral</title>
-    <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/details.css">
-    <script src="/app.js" defer></script>
-  </head>
-  <body>
-    <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
-    <div class="app">
-      <aside class="sidenav" id="sidenav">
-        <div class="sidenav-head">
-          <a class="brand" href="#/visao-geral" aria-label="Pluvia, visão geral"><img src="/logo.png" alt="Pluvia" width="360" height="272"></a>
-          <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="sidenav-panel" aria-expanded="false" aria-label="Menu"><span class="menu-toggle-bars" aria-hidden="true"></span></button>
-        </div>
-        <div class="sidenav-panel" id="sidenav-panel">
-          <nav aria-label="Telas do painel">
-            <ul class="nav-list">
-              <li><a class="nav-item" id="nav-visao-geral" href="#/visao-geral">Visão geral</a></li>
-              <li><a class="nav-item" id="nav-sinalizacoes" href="#/sinalizacoes">Sinalizações</a></li>
-              <li><a class="nav-item" id="nav-acoes" href="#/acoes">Ações</a></li>
-              <li><a class="nav-item" id="nav-assistente" href="#/assistente">Assistente</a></li>
-            </ul>
-          </nav>
-          <div class="account" id="account" aria-live="polite">
-            <span class="account-identity" id="identity">Acesso da equipe</span>
-            <button class="button button-outline" id="login-button" type="button">Entrar com Keycloak</button>
-            <button class="button button-outline" id="logout-button" type="button" hidden>Sair</button>
-          </div>
-        </div>
-      </aside>
-
-      <main class="content" id="conteudo">
-        <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
-
-        <section class="screen" id="screen-visao-geral" aria-labelledby="title-visao-geral">
-          <header class="screen-header"><p class="eyebrow">LAVRAS, MG</p><h1 id="title-visao-geral">Visão geral</h1></header>
-          <div class="screen-body" id="body-visao-geral" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
-        </section>
-
-        <section class="screen" id="screen-sinalizacoes" aria-labelledby="title-sinalizacoes" hidden>
-          <header class="screen-header"><p class="eyebrow">RISCO</p><h1 id="title-sinalizacoes">Sinalizações</h1></header>
-          <div class="screen-body" id="body-sinalizacoes" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
-        </section>
-
-        <section class="screen" id="screen-acoes" aria-labelledby="title-acoes" hidden>
-          <header class="screen-header"><p class="eyebrow">OPERAÇÕES</p><h1 id="title-acoes">Ações</h1></header>
-          <div class="screen-body" id="body-acoes" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
-        </section>
-
-        <section class="screen" id="screen-assistente" aria-labelledby="title-assistente" hidden>
-          <header class="screen-header"><p class="eyebrow">ANÁLISE</p><h1 id="title-assistente">Assistente</h1></header>
-          <div class="screen-body" id="body-assistente" aria-live="polite"><p class="muted state-message">Entre para ver os dados.</p></div>
-        </section>
-
-        <footer class="site-footer"><span>PLUVIA · Sistemas Distribuídos · UFLA</span><span>Informação de apoio, não substitui os canais oficiais.</span></footer>
-      </main>
-    </div>
-  </body>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#08335e" />
+        <link rel="icon" href="/logo.png" />
+        <title>Pluvia</title>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
 </html>
