@@ -2,6 +2,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 
 import { Ambiente } from '@infra/config/validar-ambiente';
 import { CriaRegioes1764000000000 } from '@infra/db/migrations/1764000000000-CriaRegioes';
+import { ContornosEmSetores1764100000000 } from '@infra/db/migrations/1764100000000-ContornosEmSetores';
 import { RegiaoSchema } from '@infra/db/repositories/regiao.schema';
 
 export function criarOpcoesDoBanco(
@@ -24,6 +25,6 @@ export function criarOpcoesDoBanco(
     synchronize: false,
     migrationsRun: true,
     entities: [RegiaoSchema],
-    migrations: [CriaRegioes1764000000000],
+    migrations: [CriaRegioes1764000000000, ContornosEmSetores1764100000000],
   };
 }
