@@ -2,7 +2,7 @@
 
 Dono: Lucas. Rota do painel: `/acoes`. A grade de disponibilidade depende do B3.
 
-Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md).
+Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O que é fixo e o que fica a critério de quem implementa: [README desta pasta](README.md).
 
 ## Para que serve
 

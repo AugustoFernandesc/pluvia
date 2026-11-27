@@ -2,7 +2,7 @@
 
 Dono: Lucas. Rota do painel: `/acoes/:acaoId`. Uma mudança pequena no BFF.
 
-Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O painel antigo tem a linha do tempo da SAGA em `clients/web/legado/app.js`, para consulta.
+Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O que é fixo e o que fica a critério de quem implementa: [README desta pasta](README.md). O painel antigo tem a linha do tempo da SAGA em `clients/web/legado/app.js`, para consulta.
 
 ## Para que serve
 

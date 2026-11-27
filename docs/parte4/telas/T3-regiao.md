@@ -2,7 +2,7 @@
 
 Dono: Mark. Rota do painel: `/regioes/:regiaoId`. Depende do B4.
 
-Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). A Visão geral (`src/telas/visao_geral`) é o modelo.
+Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O que é fixo e o que fica a critério de quem implementa: [README desta pasta](README.md). A Visão geral (`src/telas/visao_geral`) é o modelo.
 
 ## Para que serve
 

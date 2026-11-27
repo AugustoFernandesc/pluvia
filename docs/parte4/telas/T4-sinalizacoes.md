@@ -2,7 +2,7 @@
 
 Dono: Mark. Rota do painel: `/sinalizacoes`. Não depende de back novo.
 
-Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O painel antigo tem esta tela em `clients/web/legado/app.js`, para consulta.
+Padrões de código, componentes e regras: [clients/web/README.md](../../../clients/web/README.md). O que é fixo e o que fica a critério de quem implementa: [README desta pasta](README.md). O painel antigo tem esta tela em `clients/web/legado/app.js`, para consulta.
 
 ## Para que serve
 
