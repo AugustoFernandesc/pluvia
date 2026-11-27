@@ -3,9 +3,15 @@
 ### Monitoramento e apoio à decisão para prevenção de alagamentos urbanos
 > Plataforma que consolida dados públicos de chuva observada e prevista, histórico de ocorrências, vulnerabilidade territorial e leituras de sensores de nível, aplicando Inteligência Artificial para produzir análises contextuais de risco e para acompanhar as ações preventivas decorrentes dessas análises.
 
-**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 3: Containerização e Orquestração
+**GCC129 · Sistemas Distribuídos · 2026/2** · Parte 4: Sistema em Funcionamento
 
 > ⚠️ A Pluvia **não** prevê alagamentos, **não** emite alerta oficial à população e **não** substitui a Defesa Civil. A plataforma utiliza previsões meteorológicas produzidas por órgãos oficiais como mais uma evidência, organiza esse conjunto, produz análises e apoia o planejamento de ações preventivas de rotina, como vistoria, inspeção e manutenção de drenagem, definidas pelo próprio município. Os alertas emitidos pela plataforma são **operacionais e internos**, dirigidos à equipe técnica e aos agentes cadastrados. A decisão e a resposta a emergências permanecem humanas e institucionais.
+
+---
+
+## 🎬 Parte 4: sistema em funcionamento
+
+**Vídeo da demonstração:** [youtu.be/xcsVkiiJcVQ](https://youtu.be/xcsVkiiJcVQ) · [roteiro da demonstração](docs/parte4/demo.md) · [RAG, LangChain e LLM](docs/parte4/rag-e-llm.md)
 
 ---
 
@@ -524,7 +530,7 @@ Na borda, um **API Gateway** (Kong) e dois **BFFs**, um para o painel web e outr
 | Mensageria | RabbitMQ, com plugin MQTT |
 | Gateway | Kong |
 | Identidade | Keycloak |
-| Clientes da Parte 4 | Painel Web e consulta pública Mobile em HTML, CSS e JavaScript, servidos por Nginx |
+| Clientes da Parte 4 | Painel Web em React, Vite, TypeScript e MUI ([como criar uma tela](clients/web/README.md)); consulta pública Mobile em HTML, CSS e JavaScript. Ambos servidos por Nginx |
 
 ---
 

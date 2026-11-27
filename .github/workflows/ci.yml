@@ -58,10 +58,13 @@ jobs:
           python-version: "3.13"
       - name: Verificar sintaxe dos scripts Python
         run: python -m py_compile scripts/prepare-ci-env.py scripts/validate-infra.py scripts/ci_integration.py infra/kong/bootstrap-kong.py
-      - name: Verificar sintaxe dos clientes sem dependências de build
-        run: node --check clients/web/app.js && node --check clients/mobile/app.js
-      - name: Testes funcionais dos clientes no DOM simulado
+      - name: Verificar sintaxe do cliente Mobile, sem dependências de build
+        run: node --check clients/mobile/app.js
+      - name: Testes funcionais do cliente Mobile no DOM simulado
         run: node --test scripts/test-clients.test.cjs
+      - name: Testes e build do painel Web
+        working-directory: clients/web
+        run: npm ci && npm test && npm run build
       - name: Instalar validador YAML
         run: python -m pip install PyYAML==6.0.3
       - name: Testes do servico Analise

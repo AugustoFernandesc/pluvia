@@ -24,7 +24,9 @@ paths:
       tags: [Painel]
       operationId: obterPainel
       summary: Visão geral de todas as regiões
-      description: Compõe Risco (panoramas) e Operações (ações abertas por região).
+      description: |
+        Compõe Risco (panoramas), Operações (ações abertas por região) e Território (código e geometria de cada região).
+        Se o Território falhar, o painel responde 200 com `geometria` nula e acrescenta um aviso em `avisos`.
       parameters:
         - { name: municipio, in: query, schema: { type: string } }
       responses:
@@ -54,6 +56,31 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DetalheRegiao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /panoramas/{regiaoId}:
+    get:
+      tags: [Painel]
+      operationId: obterPanorama
+      summary: Panorama de uma região, direto do modelo de leitura do Risco
+      description: |
+        Repasse de GET /v1/panoramas/{regiaoId} do Risco, sem chamar a Análise nem outros serviços.
+        A tela de Sinalizações o consulta depois de um reconhecimento para medir a defasagem do CQRS.
+      parameters:
+        - $ref: '#/components/parameters/RegiaoId'
+      responses:
+        '200':
+          description: Panorama da região
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Panorama' }
+        '400':
+          description: regiaoId não é um UUID
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /planejamento/disponibilidade:
@@ -351,12 +378,57 @@ components:
             properties:
               regiaoId: { type: string, format: uuid }
               nome: { type: string }
+              codigo: { type: string, nullable: true, description: 'Código da região no Território; nulo se o Território falhar', example: LAV-CENTRO }
+              geometria:
+                type: object
+                nullable: true
+                description: GeoJSON Polygon ou MultiPolygon do Território; nulo se o Território falhar
+                required: [type, coordinates]
+                properties:
+                  type: { type: string, enum: [Polygon, MultiPolygon] }
+                  coordinates: { type: array, items: {} }
               nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
               sinalizacoesAbertas: { type: integer }
               acoesAbertas: { type: integer, nullable: true, description: Nulo enquanto Operações não disponibilizar a consulta }
               atualizadoEm: { type: string, format: date-time }
         atualizadoEm: { type: string, format: date-time }
         avisos: { type: array, items: { type: string }, description: Dependências indisponíveis ou ainda não implementadas }
+
+    Fator:
+      type: object
+      required: [tipo, descricao, fonte]
+      properties:
+        tipo: { type: string, example: CHUVA_ACIMA_PADRAO }
+        descricao: { type: string }
+        fonte: { type: string, example: CEMADEN }
+        referencia: { type: string, description: Data ou período de referência do dado }
+
+    Panorama:
+      type: object
+      description: Documento do modelo de leitura do Risco (schema Panorama em docs/api/risco.yaml)
+      required: [regiaoId, regiaoNome, nivelAtencao, fatores, atualizadoEm, versao]
+      properties:
+        regiaoId: { type: string, format: uuid }
+        regiaoNome: { type: string }
+        municipio: { type: string }
+        nivelAtencao: { $ref: '#/components/schemas/NivelAtencao' }
+        sinalizacoesAbertas: { type: integer }
+        fatores:
+          type: array
+          items: { $ref: '#/components/schemas/Fator' }
+        sinalizacoes:
+          type: array
+          description: Sinalizações da região, como o modelo de leitura as conhece
+          items:
+            type: object
+            required: [id, estado]
+            properties:
+              id: { type: string, format: uuid }
+              estado: { type: string, enum: [ABERTA, RECONHECIDA, ENCERRADA] }
+              nivel: { $ref: '#/components/schemas/NivelAtencao' }
+              reconhecidaEm: { type: string, format: date-time }
+        atualizadoEm: { type: string, format: date-time }
+        versao: { type: integer }
 
     DetalheRegiao:
       type: object

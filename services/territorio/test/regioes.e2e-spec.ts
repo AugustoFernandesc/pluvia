@@ -51,6 +51,15 @@ describe('/v1/regioes (e2e)', () => {
     expect(resposta.body.itens).toHaveLength(2);
   });
 
+  it('semeia contornos em setores, não uma grade de retângulos', async () => {
+    const resposta = await request(app.getHttpServer()).get('/v1/regioes?uf=mg');
+
+    for (const regiao of resposta.body.itens) {
+      const anelExterno = regiao.geometria.coordinates[0][0];
+      expect(anelExterno.length).toBeGreaterThan(8);
+    }
+  });
+
   it('obtém uma região com área calculada a partir da geometria', async () => {
     const resposta = await request(app.getHttpServer()).get(`/v1/regioes/${CENTRO}`);
 

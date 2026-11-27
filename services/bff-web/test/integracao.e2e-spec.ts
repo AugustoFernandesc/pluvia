@@ -115,6 +115,94 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     expect(response.body.contadores.acoesEmAndamento).toBe(1);
   });
 
+  describe('painel: geometria das regiões', () => {
+    const outraRegiaoId = '6f1c2a10-0000-4000-8000-000000000002';
+    const poligono = { type: 'MultiPolygon', coordinates: [[[[-45.0, -21.2], [-44.99, -21.2], [-44.99, -21.21], [-45.0, -21.2]]]] };
+    const respostaRisco = () => new Response(JSON.stringify({ itens: [
+      { regiaoId, regiaoNome: 'Centro', nivelAtencao: 'ATENCAO', sinalizacoesAbertas: 1, atualizadoEm: '2026-11-26T12:00:00Z' },
+      { regiaoId: outraRegiaoId, regiaoNome: 'Norte', nivelAtencao: 'NORMAL', sinalizacoesAbertas: 0, atualizadoEm: '2026-11-26T12:00:00Z' },
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } });
+
+    it('devolve codigo e geometria de cada região casados pelo id com o Território', async () => {
+      const token = await context.signToken(['GESTOR']);
+      fetchMock.mockImplementation(async (input: URL | RequestInfo) => {
+        const url = String(input);
+        if (url.startsWith('http://127.0.0.1:')) return fetchReal(input);
+        if (url === 'http://risco:3000/v1/panoramas?pagina=1&tamanho=100&municipio=Lavras') return respostaRisco();
+        if (url === 'http://territorio:3000/v1/regioes?municipio=Lavras&tamanho=100') {
+          // Ordem invertida em relação ao Risco: o casamento deve ser pelo id, não pela posição.
+          return new Response(JSON.stringify({ itens: [
+            { id: outraRegiaoId, codigo: 'LAV-NORTE', nome: 'Norte', geometria: { ...poligono, marca: 'norte' } },
+            { id: regiaoId, codigo: 'LAV-CENTRO', nome: 'Centro', geometria: { ...poligono, marca: 'centro' } },
+          ], total: 2 }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        return new Response(null, { status: 404 });
+      });
+
+      const response = await request(context.app.getHttpServer())
+        .get('/web/v1/painel?municipio=Lavras')
+        .set('Authorization', `Bearer ${token}`);
+      expect(response.status).toBe(200);
+      const [centro, norte] = response.body.regioes;
+      expect(centro).toMatchObject({ regiaoId, codigo: 'LAV-CENTRO', geometria: { type: 'MultiPolygon', marca: 'centro' } });
+      expect(norte).toMatchObject({ regiaoId: outraRegiaoId, codigo: 'LAV-NORTE', geometria: { marca: 'norte' } });
+      expect(response.body.avisos.some((aviso: string) => aviso.includes('geometria'))).toBe(false);
+    });
+
+    it('responde 200 com geometria null e um aviso quando o Território falha', async () => {
+      const token = await context.signToken(['TECNICO']);
+      fetchMock.mockImplementation(async (input: URL | RequestInfo) => {
+        const url = String(input);
+        if (url.startsWith('http://127.0.0.1:')) return fetchReal(input);
+        if (url.startsWith('http://risco:3000/v1/panoramas?')) return respostaRisco();
+        if (url.startsWith('http://territorio:3000/')) {
+          return new Response('{"type":"about:blank","title":"Erro","status":500}', { status: 500, headers: { 'content-type': 'application/problem+json' } });
+        }
+        return new Response(null, { status: 404 });
+      });
+
+      const response = await request(context.app.getHttpServer())
+        .get('/web/v1/painel')
+        .set('Authorization', `Bearer ${token}`);
+      expect(response.status).toBe(200);
+      expect(response.body.regioes).toHaveLength(2);
+      for (const regiao of response.body.regioes) {
+        expect(regiao.geometria).toBeNull();
+        expect(regiao.codigo).toBeNull();
+      }
+      expect(response.body.avisos.some((aviso: string) => aviso.includes('geometria'))).toBe(true);
+    });
+  });
+
+  describe('GET /web/v1/panoramas/{regiaoId}', () => {
+    const panorama = { regiaoId, regiaoNome: 'Centro', nivelAtencao: 'ATENCAO', sinalizacoes: [{ id: '8b4f6c30-0000-4000-8000-000000000001', estado: 'RECONHECIDA' }] };
+
+    it('repassa o panorama do Risco sem chamar outros serviços', async () => {
+      const tecnico = await context.signToken(['TECNICO']);
+      fetchMock.mockImplementation((input: URL | RequestInfo) => String(input).startsWith('http://127.0.0.1:')
+        ? fetchReal(input)
+        : Promise.resolve(new Response(JSON.stringify(panorama), { status: 200, headers: { 'content-type': 'application/json' } })));
+
+      const response = await request(context.app.getHttpServer())
+        .get(`/web/v1/panoramas/${regiaoId}`)
+        .set('Authorization', `Bearer ${tecnico}`)
+        .set('X-Request-ID', 'req-panorama-1');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(panorama);
+      expect(response.headers['x-request-id']).toBe('req-panorama-1');
+      const externas = fetchMock.mock.calls.filter(([url]) => !String(url).startsWith('http://127.0.0.1:'));
+      expect(externas.map(([url]) => String(url))).toEqual([`http://risco:3000/v1/panoramas/${regiaoId}`]);
+    });
+
+    it('responde 400 para id que não é UUID e 403 sem perfil GESTOR ou TECNICO', async () => {
+      const gestor = await context.signToken(['GESTOR']);
+      expect((await request(context.app.getHttpServer()).get('/web/v1/panoramas/nao-e-uuid').set('Authorization', `Bearer ${gestor}`)).status).toBe(400);
+      const agente = await context.signToken(['AGENTE']);
+      expect((await request(context.app.getHttpServer()).get(`/web/v1/panoramas/${regiaoId}`).set('Authorization', `Bearer ${agente}`)).status).toBe(403);
+      expect(fetchMock.mock.calls.filter(([url]) => !String(url).startsWith('http://127.0.0.1:'))).toHaveLength(0);
+    });
+  });
+
   it('retorna 403 a perfil incorreto e 400 para identificador de região inválido', async () => {
     const agente = await context.signToken(['AGENTE']);
     expect((await request(context.app.getHttpServer()).get(`/web/v1/regioes/${regiaoId}`).set('Authorization', `Bearer ${agente}`)).status).toBe(403);

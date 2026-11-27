@@ -229,9 +229,12 @@ def validate_clients() -> None:
     mobile = ROOT / "clients" / "mobile"
     required_files = (
         web / "index.html",
-        web / "app.js",
-        web / "styles.css",
-        web / "details.css",
+        web / "package.json",
+        web / "package-lock.json",
+        web / "src" / "main.tsx",
+        web / "src" / "auth.ts",
+        web / "src" / "api.ts",
+        web / "public" / "logo.png",
         web / "nginx.conf",
         web / "Dockerfile",
         mobile / "index.html",
@@ -241,7 +244,7 @@ def validate_clients() -> None:
         mobile / "Dockerfile",
     )
     if any(not path.is_file() for path in required_files):
-        fail("Os clientes Web e Mobile precisam conter páginas, scripts, estilos, Nginx e Dockerfiles.")
+        fail("Os clientes Web e Mobile precisam conter páginas, código, Nginx e Dockerfiles.")
         return
 
     realm = json.loads(
@@ -268,25 +271,23 @@ def validate_clients() -> None:
             if asset not in copied:
                 fail(f"{client.name}/Dockerfile não copia {asset}, carregado pelo index.html.")
 
-    web_script = (web / "app.js").read_text(encoding="utf-8")
-    web_html = (web / "index.html").read_text(encoding="utf-8")
+    # O painel Web é um projeto React: a imagem precisa buildar e servir só o resultado.
+    web_dockerfile = (web / "Dockerfile").read_text(encoding="utf-8")
+    if "npm run build" not in web_dockerfile or "COPY --from=build" not in web_dockerfile:
+        fail("clients/web/Dockerfile deve buildar o painel e copiar o resultado para o Nginx.")
+    web_auth = (web / "src" / "auth.ts").read_text(encoding="utf-8")
+    for marker in ("response_type: 'code'", "'pluvia-web'", "/auth/callback", "post_logout_redirect_uri"):
+        if marker not in web_auth:
+            fail(f"Painel Web não implementa o requisito do fluxo de navegador: {marker}.")
+    web_sources = "".join(
+        path.read_text(encoding="utf-8") for path in sorted((web / "src").rglob("*.ts*"))
+    )
+    if "client_secret" in web_sources.lower():
+        fail("O cliente público Web não pode conter um client secret.")
+    if "/web/v1/painel" not in web_sources:
+        fail("Painel Web precisa consultar o painel pelo BFF Web.")
     mobile_script = (mobile / "app.js").read_text(encoding="utf-8")
     mobile_html = (mobile / "index.html").read_text(encoding="utf-8")
-    for marker in (
-        "code_challenge_method: 'S256'",
-        "grant_type: 'authorization_code'",
-        "code_verifier: verifier",
-        "post_logout_redirect_uri: REDIRECT_URI",
-        "state.roles.includes('GESTOR')",
-        "'/web/v1/painel",
-        "'/web/v1/consultas'",
-    ):
-        if marker not in web_script:
-            fail(f"Painel Web não implementa o requisito do fluxo de navegador: {marker}.")
-    if "client_secret" in web_script.lower():
-        fail("O cliente público Web não pode conter um client secret.")
-    if not all(marker in web_html for marker in ('id="login-button"', 'id="action-form"', 'id="question-form"')):
-        fail("Painel Web precisa exibir autenticação, ação preventiva e consulta à Análise.")
     for marker in (
         "http://localhost:8000",
         "/mobile/v1/publico/regioes?municipio=Lavras",
