@@ -14,6 +14,37 @@ tags:
   - name: Agente
 
 paths:
+  /publico/regioes:
+    get:
+      tags: [Publico]
+      operationId: listarRegioesPublicas
+      summary: Lista regiões disponíveis para seleção sem expor geometrias
+      security: []
+      parameters:
+        - { name: municipio, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Identificadores e nomes das regiões consultadas em Território
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens, pagina, tamanho, total]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, nome]
+                      properties:
+                        id: { type: string, format: uuid }
+                        nome: { type: string }
+                  pagina: { type: integer }
+                  tamanho: { type: integer }
+                  total: { type: integer }
+        '429': { $ref: '#/components/responses/LimiteExcedido' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
+
   /publico/regioes/localizar:
     get:
       tags: [Publico]

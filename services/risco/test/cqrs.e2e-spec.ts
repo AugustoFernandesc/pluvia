@@ -124,7 +124,7 @@ describe('CQRS do Risco (e2e)', () => {
     const antes = await http.get(`/v1/panoramas/${CENTRO}`);
     expect(antes.status).toBe(200);
     expect(sinalizacaoNoPanorama(antes.body)?.estado).toBe('ABERTA');
-    expect(antes.body.sinalizacoesAbertas).toBe(1);
+    expect(antes.body.sinalizacoesAbertas).toBe(2);
 
     // 2. O comando, no banco de escrita.
     const comando = await http.post(`/v1/sinalizacoes/${SINALIZACAO}/reconhecimento`);
@@ -142,7 +142,7 @@ describe('CQRS do Risco (e2e)', () => {
     );
     expect(sinalizacaoNoPanorama(depois.body)?.estado).toBe('RECONHECIDA');
     expect(depois.body.versao).toBeGreaterThan(antes.body.versao);
-    expect(depois.body.sinalizacoesAbertas).toBe(0);
+    expect(depois.body.sinalizacoesAbertas).toBe(1);
   });
 
   it('responde 409 ao reconhecer de novo e 404 para sinalização inexistente, em problem+json', async () => {

@@ -68,6 +68,10 @@ paths:
                   type: string
                   format: uuid
                   description: Quando informado, a resposta considera o contexto atual da região
+                usarRecuperacao:
+                  type: boolean
+                  default: true
+                  description: Falso responde só com o modelo, sem consultar a base. Usado na avaliação do RAG
       responses:
         '200':
           description: Resposta com trechos recuperados
@@ -79,6 +83,24 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problema' }
+
+  /llm:
+    get:
+      tags: [Consultas]
+      operationId: estadoLlm
+      summary: Estado do provedor de LLM visto pela Análise
+      responses:
+        "200":
+          description: Modelo em uso, estado do circuit breaker e tamanho do cache
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modelo: { type: string }
+                  modeloEmbedding: { type: string }
+                  circuito: { type: string, enum: [FECHADO, ABERTO, MEIO_ABERTO] }
+                  respostasEmCache: { type: integer }
 
   /documentos:
     get:
@@ -177,7 +199,19 @@ components:
               titulo: { type: string }
               trecho: { type: string }
               similaridade: { type: number, minimum: 0, maximum: 1 }
-        origem: { type: string, enum: [LLM, CACHE] }
+        origem:
+          type: string
+          enum: [LLM, CACHE, FALLBACK]
+          description: FALLBACK indica que o modelo estava indisponível e a resposta traz só os trechos recuperados
+        modelo: { type: string, nullable: true }
+        latenciaMs: { type: integer }
+        buscaDegradada:
+          type: boolean
+          description: Verdadeiro quando o modelo de embeddings estava fora e a busca foi por palavras-chave
+        etapasMs:
+          type: object
+          description: Tempo de cada etapa (recuperacao, geracao)
+          additionalProperties: { type: integer }
 
     Documento:
       type: object

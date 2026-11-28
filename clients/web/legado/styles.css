@@ -1,0 +1,96 @@
+/* Tokens, base e casca do painel (navegação lateral e área de conteúdo). */
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --ink: #0c2745;
+  --muted: #5a6b80;
+  --line: #d9e2ee;
+  /* Azul da palavra PLUVIA na logo, e o azul da nuvem como destaque. */
+  --brand: #083461;
+  --brand-light: #1c8bd2;
+  --deep: #083461;
+  --surface: #fff;
+  --canvas: #f3f6fa;
+  --orange: #c65d12;
+  --radius: 14px;
+  --sidenav-width: 248px;
+
+  /* Cor de cada nível de atenção: fundo, texto sobre o fundo e traço do mapa. */
+  --nivel-normal: #2e8b57;
+  --nivel-normal-soft: #e3f4ea;
+  --nivel-observacao: #c79a00;
+  --nivel-observacao-soft: #fbf3d4;
+  --nivel-atencao: #e07b00;
+  --nivel-atencao-soft: #fde9cf;
+  --nivel-alta: #c62828;
+  --nivel-alta-soft: #fbdede;
+  --nivel-desconhecido: #8a9a9c;
+  --nivel-desconhecido-soft: #e9eeee;
+
+  /* Cor de cada tipo de passo da SAGA. */
+  --passo-ida: #2e8b57;
+  --passo-recusa: #c79a00;
+  --passo-compensacao: #c62828;
+  --passo-ignorada: #8a9a9c;
+
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { min-height: 100vh; color: var(--ink); background: var(--canvas); line-height: 1.5; }
+h1, h2, h3, p { margin-top: 0; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 20; padding: 8px 14px; background: var(--surface); color: var(--ink); }
+.skip-link:focus { left: 8px; top: 8px; }
+
+/* Casca: coluna lateral fixa e conteúdo que rola. */
+.app { display: grid; grid-template-columns: var(--sidenav-width) minmax(0, 1fr); min-height: 100vh; }
+
+.sidenav { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; background: var(--deep); color: #e6eef7; }
+.sidenav-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 20px 14px; }
+.sidenav-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0 12px 20px; overflow-y: auto; }
+
+.brand { display: block; flex: 1; padding: 10px 14px; border-radius: 12px; background: var(--surface); }
+.brand img { display: block; width: 100%; max-width: 170px; height: auto; margin: 0 auto; }
+
+.nav-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.nav-item { display: block; padding: 11px 14px; border-radius: 10px; color: #cfdcec; text-decoration: none; font-weight: 600; }
+.nav-item:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.nav-item[aria-current="page"] { background: rgba(255, 255, 255, .14); box-shadow: inset 3px 0 0 var(--brand-light); color: #fff; }
+
+.account { display: grid; gap: 10px; margin-top: auto; padding: 16px 8px 0; border-top: 1px solid rgba(255, 255, 255, .14); }
+.account-identity { font-size: .88rem; color: #cfdcec; overflow-wrap: anywhere; }
+
+.menu-toggle { display: none; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255, 255, 255, .35); border-radius: 10px; background: transparent; cursor: pointer; }
+.menu-toggle-bars, .menu-toggle-bars::before, .menu-toggle-bars::after { display: block; width: 20px; height: 2px; margin: 0 auto; background: #fff; content: ""; }
+.menu-toggle-bars { position: relative; }
+.menu-toggle-bars::before { position: absolute; top: -6px; left: 0; }
+.menu-toggle-bars::after { position: absolute; top: 6px; left: 0; }
+
+.content { min-width: 0; padding: 28px clamp(16px, 3vw, 40px) 24px; }
+.screen[hidden] { display: none; }
+.screen-header { margin-bottom: 20px; }
+.screen-header h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15; }
+.eyebrow { margin: 0 0 4px; font-size: .72rem; font-weight: 700; letter-spacing: .12em; color: var(--brand); }
+.screen-body { min-width: 0; }
+
+.site-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+
+/* Abaixo de 900 px a coluna lateral vira uma barra no topo, recolhível. */
+@media (max-width: 899px) {
+  .app { display: block; }
+  .sidenav { position: sticky; top: 0; z-index: 10; height: auto; max-height: 100vh; }
+  .sidenav-head { gap: 12px; padding: 12px 16px; }
+  .brand { flex: 0 0 auto; padding: 6px 10px; }
+  .brand img { width: auto; height: 40px; }
+  .menu-toggle { display: block; }
+  .sidenav-panel { display: none; }
+  .sidenav.is-open .sidenav-panel { display: flex; max-height: calc(100vh - 68px); }
+  .content { padding: 20px 16px 20px; }
+}

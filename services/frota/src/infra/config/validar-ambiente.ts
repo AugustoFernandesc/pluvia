@@ -1,9 +1,18 @@
+/**
+ * O RabbitMQ vem em partes, e a URL amqp:// é montada no código. Assim a
+ * senha pode vir sozinha de um Secret, sem ninguém precisar montar a URL.
+ */
 export interface Ambiente {
   POSTGRES_HOST: string;
   POSTGRES_PORT: number;
   POSTGRES_DB: string;
   POSTGRES_USER: string;
   POSTGRES_PASSWORD: string;
+  RABBITMQ_HOST: string;
+  RABBITMQ_PORT: number;
+  RABBITMQ_VHOST: string;
+  RABBITMQ_USER: string;
+  RABBITMQ_PASSWORD: string;
   PORT: number;
 }
 
@@ -12,9 +21,13 @@ const VARIAVEIS_TEXTO = [
   'POSTGRES_DB',
   'POSTGRES_USER',
   'POSTGRES_PASSWORD',
+  'RABBITMQ_HOST',
+  'RABBITMQ_VHOST',
+  'RABBITMQ_USER',
+  'RABBITMQ_PASSWORD',
 ] as const;
 
-const VARIAVEIS_PORTA = ['POSTGRES_PORT', 'PORT'] as const;
+const VARIAVEIS_PORTA = ['POSTGRES_PORT', 'RABBITMQ_PORT', 'PORT'] as const;
 
 const ORDEM = [
   'POSTGRES_HOST',
@@ -22,6 +35,11 @@ const ORDEM = [
   'POSTGRES_DB',
   'POSTGRES_USER',
   'POSTGRES_PASSWORD',
+  'RABBITMQ_HOST',
+  'RABBITMQ_PORT',
+  'RABBITMQ_VHOST',
+  'RABBITMQ_USER',
+  'RABBITMQ_PASSWORD',
   'PORT',
 ] as const;
 

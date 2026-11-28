@@ -6,6 +6,11 @@ const ambienteCompleto: Record<string, string> = {
   POSTGRES_DB: 'servico',
   POSTGRES_USER: 'servico',
   POSTGRES_PASSWORD: 'troque-esta-senha',
+  RABBITMQ_HOST: 'rabbitmq',
+  RABBITMQ_PORT: '5672',
+  RABBITMQ_VHOST: 'pluvia',
+  RABBITMQ_USER: 'pluvia-servicos',
+  RABBITMQ_PASSWORD: 'troque-esta-senha',
   PORT: '3000',
 };
 
@@ -19,6 +24,11 @@ describe('validarAmbiente', () => {
       POSTGRES_DB: 'servico',
       POSTGRES_USER: 'servico',
       POSTGRES_PASSWORD: 'troque-esta-senha',
+      RABBITMQ_HOST: 'rabbitmq',
+      RABBITMQ_PORT: 5672,
+      RABBITMQ_VHOST: 'pluvia',
+      RABBITMQ_USER: 'pluvia-servicos',
+      RABBITMQ_PASSWORD: 'troque-esta-senha',
       PORT: 3000,
     });
   });
@@ -40,11 +50,11 @@ describe('validarAmbiente', () => {
 
   it('nomeia todas as variáveis ausentes de uma vez', () => {
     expect(() => validarAmbiente({})).toThrow(
-      /POSTGRES_HOST.*POSTGRES_PORT.*POSTGRES_DB.*POSTGRES_USER.*POSTGRES_PASSWORD.*PORT/s,
+      /POSTGRES_HOST.*POSTGRES_PORT.*POSTGRES_DB.*POSTGRES_USER.*POSTGRES_PASSWORD.*RABBITMQ_HOST.*RABBITMQ_PORT.*RABBITMQ_VHOST.*RABBITMQ_USER.*RABBITMQ_PASSWORD.*PORT/s,
     );
   });
 
-  it.each(['POSTGRES_PORT', 'PORT'])(
+  it.each(['POSTGRES_PORT', 'RABBITMQ_PORT', 'PORT'])(
     'rejeita %s não numérico',
     (variavel) => {
       expect(() =>

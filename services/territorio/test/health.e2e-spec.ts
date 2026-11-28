@@ -33,7 +33,7 @@ describe('GET /health (e2e)', () => {
     // O Docker sorteia outra porta do host quando o container reinicia. A porta
     // fica fixa para a aplicação, que não é recriada, achar o banco de volta.
     portaDoBanco = await obterPortaLivre();
-    banco = await new PostgreSqlContainer('postgres:17-alpine')
+    banco = await new PostgreSqlContainer('postgis/postgis:17-3.5-alpine')
       .withExposedPorts({ container: 5432, host: portaDoBanco })
       .start();
 

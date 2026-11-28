@@ -2,7 +2,7 @@
 
 A Pluvia tem dois clientes com usuários, contextos e restrições muito diferentes. Um único backend genérico obrigaria um dos dois a receber dados que não usa, ou a fazer várias chamadas para montar uma tela. Por isso, cada cliente tem o seu BFF.
 
-> **Estado da implementação da Parte 3:** os contratos abaixo descrevem o desenho de domínio, mas esta entrega implementa somente os BFFs, a validação JWT e rotas técnicas sob `/_system` para testar autenticação e autorização. A composição das respostas de negócio não é simulada nem declarada como pronta.
+> **Parte 4:** os BFFs passam a encaminhar os fluxos do painel Web e a compor região/painel com os dados realmente disponíveis de Território e Risco. Campos de Operações, vulnerabilidade, ocorrências e síntese por região permanecem explicitamente ausentes enquanto os endpoints correspondentes não forem publicados. A consulta RAG existente é encaminhada a `POST /v1/consultas`.
 
 ---
 
@@ -28,12 +28,14 @@ Essas diferenças não são cosméticas. Elas mudam **quais dados** vão na resp
 
 | Endpoint | Compõe dados de |
 |---|---|
-| `GET /painel` | Risco (panoramas), Operações (ações abertas por região) |
-| `GET /regioes/{id}` | Risco (panorama e cenário previsto), Território (região, vulnerabilidade, ocorrências), Operações (ações), Análise (síntese) |
+| `GET /painel` | Risco (panoramas); Operações quando disponível |
+| `GET /regioes/{id}` | Território (região), Risco (panorama e cenário previsto); vulnerabilidade, ocorrências, Operações e síntese quando disponíveis |
 | `GET /sinalizacoes` e `POST /sinalizacoes/{id}/reconhecimento` | Risco |
 | `GET /ocorrencias` e `POST /ocorrencias/{id}/validacao` | Território |
 | `GET /planejamento/disponibilidade` | Equipes e Frota, em paralelo |
 | `GET, POST /acoes`, `GET /acoes/{id}`, transições | Operações |
+| `GET /acoes/{id}/saga` | Operações, exclusivo de GESTOR |
+| `POST /consultas` | Análise (base de conhecimento/RAG) |
 
 **Perfis aceitos:** `GESTOR`, `TECNICO`.
 
@@ -44,6 +46,7 @@ Essas diferenças não são cosméticas. Elas mudam **quais dados** vão na resp
 | Endpoint | Compõe dados de | Autenticação |
 |---|---|---|
 | `GET /publico/regioes/localizar?lat=&lng=` | Território | Não |
+| `GET /publico/regioes?municipio=` | Território, nomes e identificadores sem geometria | Não |
 | `GET /publico/regioes/{id}/resumo` | Risco | Não |
 | `GET /minhas-acoes` | Operações, Território (nome da região) | Agente |
 | `GET /acoes/{id}`, `POST /acoes/{id}/inicio`, `POST /acoes/{id}/conclusao` | Operações | Agente |
@@ -139,7 +142,7 @@ Região Centro, no mesmo instante. Os dados de origem são os mesmos; a resposta
 | **Análise da IA** | Síntese técnica completa | Substituída por mensagem simplificada |
 | **Ações da prefeitura** | Detalhadas | Apenas "a prefeitura está acompanhando", sem expor equipes ou veículos |
 
-A última linha é também uma decisão de privacidade: o público não precisa saber qual equipe ou veículo foi alocado.
+A última linha é também uma decisão de privacidade: o público não precisa saber qual equipe ou veículo foi alocado. O resumo público usa o nível de atenção e a data realmente retornados por Risco; sem dados essenciais, responde com `503` ou propaga o erro de domínio.
 
 ### Mesma ação, dois BFFs
 
