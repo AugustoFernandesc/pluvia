@@ -18,6 +18,17 @@ export class SinalizacoesController {
     return enviarRespostaInterna(response, upstream, upstream.body, request.header('x-request-id'));
   }
 
+  @Get(':sinalizacaoId')
+  @Perfis('GESTOR', 'TECNICO')
+  async obter(
+    @Param('sinalizacaoId', new ParseUUIDPipe()) sinalizacaoId: string,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<Response> {
+    const upstream = await this.servicos.requisitar('RISCO', `v1/sinalizacoes/${sinalizacaoId}`, request, { preservarQuery: false });
+    return enviarRespostaInterna(response, upstream, upstream.body, request.header('x-request-id'));
+  }
+
   @Post(':sinalizacaoId/reconhecimento')
   @Perfis('TECNICO')
   async reconhecer(

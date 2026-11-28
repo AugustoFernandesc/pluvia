@@ -15,6 +15,8 @@ import { PanoramasController } from '@app/panoramas/panoramas.controller';
 import { RegioesController } from '@app/regioes/regioes.controller';
 import { SinalizacoesController } from '@app/sinalizacoes/sinalizacoes.controller';
 
+import { PlanejamentoController } from '@app/planejamento/planejamento.controller';
+
 import { GlobalModule } from './global.module';
 
 @Module({
@@ -23,6 +25,7 @@ import { GlobalModule } from './global.module';
     HealthController,
     TechnicalController,
     RegioesController,
+    PlanejamentoController,
     AcoesController,
     PainelController,
     PanoramasController,

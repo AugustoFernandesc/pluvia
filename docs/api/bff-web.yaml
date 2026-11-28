@@ -44,9 +44,7 @@ paths:
       tags: [Painel]
       operationId: obterDetalheRegiao
       summary: Detalhe completo de uma região
-      description: |
-        Compõe Risco, Território, Operações e Análise, em paralelo.
-        Se a Análise não responder em 8 s, o bloco analise vem nulo e o restante é entregue normalmente.
+      description: Compõe Risco, Território e Operações sem esperar a análise.
       parameters:
         - $ref: '#/components/parameters/RegiaoId'
       responses:
@@ -57,6 +55,23 @@ paths:
               schema: { $ref: '#/components/schemas/DetalheRegiao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /regioes/{regiaoId}/analise:
+    get:
+      tags: [Painel]
+      operationId: obterAnaliseRegiao
+      summary: Síntese da situação atual da região
+      parameters:
+        - $ref: '#/components/parameters/RegiaoId'
+      responses:
+        '200':
+          description: Síntese, fontes e metadados
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '503': { $ref: '#/components/responses/Indisponivel' }
 
   /panoramas/{regiaoId}:
     get:
@@ -91,6 +106,8 @@ paths:
       description: Compõe Equipes e Frota, em paralelo.
       parameters:
         - { name: data, in: query, required: true, schema: { type: string, format: date } }
+        - { name: especialidade, in: query, schema: { type: string } }
+        - { name: categoria, in: query, schema: { type: string } }
       responses:
         '200':
           description: Disponibilidade combinada
@@ -154,7 +171,7 @@ paths:
     get:
       tags: [Acoes]
       operationId: obterSagaWeb
-      summary: Consulta o estado real da SAGA de uma ação. Exclusivo do papel GESTOR
+      summary: Consulta o estado real da SAGA de uma ação para Gestor e Técnico
       parameters:
         - { name: acaoId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -233,6 +250,23 @@ paths:
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '403': { $ref: '#/components/responses/Proibido' }
         '503': { $ref: '#/components/responses/Indisponivel' }
+
+  /sinalizacoes/{sinalizacaoId}:
+    get:
+      tags: [Sinalizacoes]
+      operationId: obterSinalizacaoWeb
+      summary: Consulta uma sinalização no Risco
+      parameters:
+        - { name: sinalizacaoId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Sinalização
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/Proibido' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /sinalizacoes/{sinalizacaoId}/reconhecimento:
     post:
@@ -447,23 +481,6 @@ components:
           properties:
             abertas: { type: integer }
             itens: { type: array, items: { type: object } }
-        analise:
-          type: object
-          nullable: true
-          description: Síntese real de Análise. Nulo se a dependência responder com erro
-          properties:
-            sintese: { type: string }
-            origem: { type: string, enum: [LLM, CACHE, FALLBACK] }
-            fontes:
-              type: array
-              items:
-                type: object
-                properties:
-                  nome: { type: string }
-                  referencia: { type: string }
-            modelo: { type: string, nullable: true }
-            latenciaMs: { type: integer, nullable: true }
-            geradaEm: { type: string, format: date-time }
         avisos:
           type: array
           items: { type: string }
@@ -471,8 +488,9 @@ components:
 
     DisponibilidadePlanejamento:
       type: object
-      required: [data, equipes, recursos]
+      required: [data, equipes, recursos, avisos]
       properties:
         data: { type: string, format: date }
-        equipes: { type: array, items: { type: object }, description: De Equipes }
-        recursos: { type: array, items: { type: object }, description: De Frota }
+        equipes: { type: array, nullable: true, items: { type: object }, description: De Equipes }
+        recursos: { type: array, nullable: true, items: { type: object }, description: De Frota }
+        avisos: { type: array, items: { type: string } }

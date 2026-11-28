@@ -17,6 +17,8 @@ describe('validarAmbiente', () => {
       OPERACOES_URL: 'http://operacoes:3000',
       RISCO_URL: 'http://risco:3000',
       ANALISE_URL: 'http://analise:8000',
+      EQUIPES_URL: 'http://equipes:3000',
+      FROTA_URL: 'http://frota:3000',
       UPSTREAM_TIMEOUT_MS: 2_000,
       ANALISE_TIMEOUT_MS: 120_000,
       ANALISE_SINTESE_TIMEOUT_MS: 30_000,

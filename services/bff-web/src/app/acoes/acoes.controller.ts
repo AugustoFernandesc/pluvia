@@ -34,7 +34,7 @@ export class AcoesController {
   }
 
   @Get(':acaoId/saga')
-  @Perfis('GESTOR')
+  @Perfis('GESTOR', 'TECNICO')
   async saga(
     @Param('acaoId', new ParseUUIDPipe()) acaoId: string,
     @Req() request: Request,

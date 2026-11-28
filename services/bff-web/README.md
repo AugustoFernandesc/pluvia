@@ -24,7 +24,7 @@ O container escuta na porta 3000 e roda como usuário sem privilégios. O Docker
 
 Além das rotas técnicas, o BFF expõe `GET /web/v1/painel`, `GET /web/v1/regioes/{id}`, encaminhamento de ações/SAGA, reconhecimento de sinalizações e `POST /web/v1/consultas`. A composição marca os blocos opcionais indisponíveis em `avisos`; não cria valores para serviços ainda sem endpoint.
 
-Os endereços internos vêm de `TERRITORIO_URL`, `OPERACOES_URL`, `RISCO_URL` e `ANALISE_URL`. Cada chamada tem timeout; rede indisponível responde `503 application/problem+json`, timeout responde `504 application/problem+json`, e erros HTTP de domínio mantêm status, corpo e content-type. POST não tem retry automático. Apenas `X-Request-ID` e, na criação de ação, `Idempotency-Key` são encaminhados; identidade é derivada do JWT validado.
+Os endereços internos vêm de `TERRITORIO_URL`, `OPERACOES_URL`, `RISCO_URL`, `ANALISE_URL`, `EQUIPES_URL` e `FROTA_URL`. Cada chamada tem timeout; rede indisponível responde `503 application/problem+json`, timeout responde `504 application/problem+json`, e erros HTTP de domínio mantêm status, corpo e content-type. POST não tem retry automático. Apenas `X-Request-ID` e, na criação de ação, `Idempotency-Key` são encaminhados; identidade é derivada do JWT validado.
 
 Links HAL de Operações e o header `Location` são convertidos para `/web/v1/...` quando apontam para ações do serviço.
 

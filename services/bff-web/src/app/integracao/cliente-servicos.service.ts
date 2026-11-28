@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 
-export type ServicoInterno = 'TERRITORIO' | 'OPERACOES' | 'RISCO' | 'ANALISE';
+export type ServicoInterno = 'TERRITORIO' | 'OPERACOES' | 'RISCO' | 'ANALISE' | 'EQUIPES' | 'FROTA';
 
 export interface RespostaInterna {
   status: number;
@@ -42,6 +42,8 @@ export class ClienteServicosService {
       OPERACOES: config.getOrThrow<string>('OPERACOES_URL'),
       RISCO: config.getOrThrow<string>('RISCO_URL'),
       ANALISE: config.getOrThrow<string>('ANALISE_URL'),
+      EQUIPES: config.getOrThrow<string>('EQUIPES_URL'),
+      FROTA: config.getOrThrow<string>('FROTA_URL'),
     };
     this.timeoutPadrao = config.getOrThrow<number>('UPSTREAM_TIMEOUT_MS');
     this.timeoutAnalise = config.getOrThrow<number>('ANALISE_TIMEOUT_MS');

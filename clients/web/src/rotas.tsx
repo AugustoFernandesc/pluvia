@@ -3,12 +3,15 @@ import ChatIcon from '@mui/icons-material/ForumOutlined';
 import MapIcon from '@mui/icons-material/MapOutlined';
 import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { SvgIconComponent } from '@mui/icons-material';
-import Typography from '@mui/material/Typography';
 import { ComponentType } from 'react';
 
-import { Pagina } from './componentes/Layout';
 import { Perfil } from './perfis';
 import VisaoGeral from './telas/visao_geral';
+import Regiao from './telas/regiao';
+import Sinalizacoes from './telas/sinalizacoes';
+import Acoes from './telas/acoes';
+import DetalheAcao from './telas/detalhe_acao';
+import Assistente from './telas/assistente';
 
 export interface Rota {
     caminho: string;
@@ -19,16 +22,6 @@ export interface Rota {
     menu?: boolean;
     /** Sem `perfis`, a rota abre para qualquer usuário do painel. */
     perfis?: Perfil[];
-}
-
-function emConstrucao(titulo: string): ComponentType {
-    return function EmConstrucao() {
-        return (
-            <Pagina titulo={titulo}>
-                <Typography color="text.secondary">Esta tela ainda está em construção.</Typography>
-            </Pagina>
-        );
-    };
 }
 
 export const ROTA_INICIAL = '/visao-geral';
@@ -45,27 +38,27 @@ export const ROTAS: Rota[] = [
         menu: true,
         tela: VisaoGeral,
     },
-    { caminho: '/regioes/:regiaoId', rotulo: 'Região', tela: emConstrucao('Região') },
+    { caminho: '/regioes/:regiaoId', rotulo: 'Região', tela: Regiao },
     {
         caminho: '/sinalizacoes',
         rotulo: 'Sinalizações',
         icone: WarningIcon,
         menu: true,
-        tela: emConstrucao('Sinalizações'),
+        tela: Sinalizacoes,
     },
     {
         caminho: '/acoes',
         rotulo: 'Ações',
         icone: AssignmentIcon,
         menu: true,
-        tela: emConstrucao('Ações'),
+        tela: Acoes,
     },
-    { caminho: '/acoes/:acaoId', rotulo: 'Ação', tela: emConstrucao('Ação') },
+    { caminho: '/acoes/:acaoId', rotulo: 'Ação', tela: DetalheAcao },
     {
         caminho: '/assistente',
         rotulo: 'Assistente',
         icone: ChatIcon,
         menu: true,
-        tela: emConstrucao('Assistente'),
+        tela: Assistente,
     },
 ];

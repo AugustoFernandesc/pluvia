@@ -40,8 +40,9 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     expect(resposta.body.panorama.nivelAtencao).toBe('ATENCAO');
     expect(resposta.body.vulnerabilidade).toBeNull();
     expect(resposta.body.acoes).toBeNull();
-    expect(resposta.body.analise).toBeNull();
-    expect(resposta.body.avisos).toHaveLength(4);
+    expect(resposta.body.analise).toBeUndefined();
+    expect(resposta.body.avisos).toHaveLength(3);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('analise:8000'))).toBe(false);
     expect(resposta.headers['x-request-id']).toBe('req-region-1');
   });
 
@@ -72,10 +73,10 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     });
 
     const response = await request(context.app.getHttpServer())
-      .get(`/web/v1/regioes/${regiaoId}`)
+      .get(`/web/v1/regioes/${regiaoId}/analise`)
       .set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(200);
-    expect(response.body.analise).toEqual({
+    expect(response.body).toMatchObject({
       sintese: 'Centro merece atenção conforme o panorama publicado.',
       fontes: expect.arrayContaining([expect.objectContaining({ nome: 'Território' }), expect.objectContaining({ nome: 'Risco' })]),
       origem: 'FALLBACK',
@@ -87,6 +88,28 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     expect(call).toBeDefined();
     const [, init] = call as [URL, RequestInit];
     expect(JSON.parse(String(init.body))).toEqual({ regiaoId, tipo: 'SITUACAO_ATUAL' });
+  });
+
+  it('combines availability and handles partial failure', async () => {
+    const token = await context.signToken(['GESTOR']);
+    fetchMock.mockImplementation(async (input: URL | RequestInfo) => {
+      const url = String(input);
+      if (url.startsWith('http://127.0.0.1:')) return fetchReal(input);
+      if (url === 'http://equipes:3000/v1/disponibilidade?data=2026-12-01&especialidade=GERAL')
+        return new Response(JSON.stringify([{ equipeNome: 'Equipe', turnos: [] }]), { status: 200 });
+      return new Response(null, { status: 503 });
+    });
+    const response = await request(context.app.getHttpServer())
+      .get('/web/v1/planejamento/disponibilidade?data=2026-12-01&especialidade=GERAL&categoria=KIT_VISTORIA')
+      .set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(200);
+    expect(response.body.equipes).toHaveLength(1);
+    expect(response.body.recursos).toBeNull();
+    expect(response.body.avisos).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === 'http://frota:3000/v1/disponibilidade?data=2026-12-01&categoria=KIT_VISTORIA')).toBe(true);
+    expect((await request(context.app.getHttpServer()).get('/web/v1/planejamento/disponibilidade?data=invalida').set('Authorization', `Bearer ${token}`)).status).toBe(400);
+    const agente = await context.signToken(['AGENTE']);
+    expect((await request(context.app.getHttpServer()).get('/web/v1/planejamento/disponibilidade?data=2026-12-01').set('Authorization', `Bearer ${agente}`)).status).toBe(403);
   });
 
   it('contabiliza apenas estados conhecidos como ações em andamento', async () => {
@@ -211,6 +234,20 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     expect(fetchMock.mock.calls.filter(([url]) => !String(url).startsWith('http://127.0.0.1:'))).toHaveLength(0);
   });
 
+  it('permite consultar a SAGA para gestor e tecnico, mas nao para outros perfis', async () => {
+    fetchMock.mockImplementation((input: URL | RequestInfo) => String(input).startsWith('http://127.0.0.1:')
+      ? fetchReal(input)
+      : Promise.resolve(new Response(JSON.stringify({ estado: 'CONCLUIDA', passos: [] }), { status: 200, headers: { 'content-type': 'application/json' } })));
+    for (const perfil of ['GESTOR', 'TECNICO']) {
+      const token = await context.signToken([perfil]);
+      const response = await request(context.app.getHttpServer()).get(`/web/v1/acoes/${acaoId}/saga`).set('Authorization', `Bearer ${token}`);
+      expect(response.status).toBe(200);
+      expect(response.body.estado).toBe('CONCLUIDA');
+    }
+    const agente = await context.signToken(['AGENTE']);
+    expect((await request(context.app.getHttpServer()).get(`/web/v1/acoes/${acaoId}/saga`).set('Authorization', `Bearer ${agente}`)).status).toBe(403);
+  });
+
   it('reescreve links HAL na consulta da ação e não encaminha headers de identidade', async () => {
     const tecnico = await context.signToken(['TECNICO']);
     const resposta = new Response(JSON.stringify({
@@ -302,6 +339,20 @@ describe('BFF Web: contratos integrados com os serviços de domínio', () => {
     expect((await request(context.app.getHttpServer())
       .post(`/web/v1/sinalizacoes/${sinalizacaoId}/reconhecimento`)
       .set('Authorization', `Bearer ${agente}`)).status).toBe(403);
+  });
+
+  it('permite ao tecnico consultar uma sinalizacao de origem', async () => {
+    const id = '8b4f6c30-0000-4000-8000-000000000001';
+    const tecnico = await context.signToken(['TECNICO']);
+    fetchMock.mockImplementation((input: URL | RequestInfo) => String(input).startsWith('http://127.0.0.1:')
+      ? fetchReal(input)
+      : Promise.resolve(new Response(JSON.stringify({ id, estado: 'RECONHECIDA' }), { status: 200, headers: { 'content-type': 'application/json' } })));
+    const resposta = await request(context.app.getHttpServer()).get(`/web/v1/sinalizacoes/${id}`).set('Authorization', `Bearer ${tecnico}`);
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.id).toBe(id);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === `http://risco:3000/v1/sinalizacoes/${id}`)).toBe(true);
+    const agente = await context.signToken(['AGENTE']);
+    expect((await request(context.app.getHttpServer()).get(`/web/v1/sinalizacoes/${id}`).set('Authorization', `Bearer ${agente}`)).status).toBe(403);
   });
 
   it('lista as sinalizações repassando o filtro ao modelo de escrita do Risco', async () => {

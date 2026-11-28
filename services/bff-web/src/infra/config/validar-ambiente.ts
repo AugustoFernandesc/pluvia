@@ -7,6 +7,8 @@ export interface AmbienteBff {
   OPERACOES_URL: string;
   RISCO_URL: string;
   ANALISE_URL: string;
+  EQUIPES_URL: string;
+  FROTA_URL: string;
   UPSTREAM_TIMEOUT_MS: number;
   ANALISE_TIMEOUT_MS: number;
   ANALISE_SINTESE_TIMEOUT_MS: number;
@@ -72,6 +74,8 @@ export function validarAmbiente(config: Record<string, unknown>): AmbienteBff {
     OPERACOES_URL: 'http://operacoes:3000',
     RISCO_URL: 'http://risco:3000',
     ANALISE_URL: 'http://analise:8000',
+    EQUIPES_URL: 'http://equipes:3000',
+    FROTA_URL: 'http://frota:3000',
   };
   for (const [nome, padrao] of Object.entries(urls)) {
     const valor = config[nome] === undefined ? padrao : config[nome];

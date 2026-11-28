@@ -42,7 +42,7 @@ export class RegioesController {
       );
     }
 
-    const [vulnerabilidade, ocorrencias, acoes, analise] = await Promise.all([
+    const [vulnerabilidade, ocorrencias, acoes] = await Promise.all([
       this.servicos.requisitar('TERRITORIO', `v1/regioes/${regiaoId}/vulnerabilidade`, request),
       this.servicos.requisitar(
         'TERRITORIO',
@@ -55,16 +55,6 @@ export class RegioesController {
         `v1/acoes?regiaoId=${encodeURIComponent(regiaoId)}&tamanho=100`,
         request,
         { preservarQuery: false },
-      ),
-      this.servicos.requisitar(
-        'ANALISE',
-        'v1/analises',
-        request,
-        {
-          metodo: 'POST',
-          corpo: { regiaoId, tipo: 'SITUACAO_ATUAL' },
-          timeoutMs: this.servicos.timeoutAnaliseRegional,
-        },
       ),
     ]);
 
@@ -83,11 +73,6 @@ export class RegioesController {
       acoes,
       avisos,
       'Operações ainda não disponibiliza a consulta de ações para esta região.',
-    );
-    const analiseBody = this.opcional<Record<string, unknown>>(
-      analise,
-      avisos,
-      'Análise ainda não disponibiliza a síntese por região neste fluxo.',
     );
 
     const ocorrenciasItens = this.itens(ocorrenciasBody);
@@ -110,19 +95,22 @@ export class RegioesController {
               abertas: acoesItens.filter((acao) => ['PENDENTE', 'CONFIRMADA', 'EM_EXECUCAO'].includes(String(acao.estado))).length,
               itens: acoesItens,
             },
-      analise:
-        analiseBody && typeof analiseBody.sintese === 'string'
-          ? {
-              sintese: analiseBody.sintese,
-              fontes: Array.isArray(analiseBody.fontes) ? analiseBody.fontes : [],
-              origem: analiseBody.origem,
-              modelo: analiseBody.modelo ?? null,
-              latenciaMs: analiseBody.latenciaMs ?? null,
-              geradaEm: analiseBody.geradaEm,
-            }
-          : null,
       avisos,
     });
+  }
+
+  @Get(':regiaoId/analise')
+  @Perfis('GESTOR', 'TECNICO')
+  async analise(
+    @Param('regiaoId', new ParseUUIDPipe()) regiaoId: string,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<Response> {
+    const upstream = await this.servicos.requisitar('ANALISE', 'v1/analises', request, {
+      metodo: 'POST', corpo: { regiaoId, tipo: 'SITUACAO_ATUAL' },
+      timeoutMs: this.servicos.timeoutAnaliseRegional, preservarQuery: false,
+    });
+    return this.enviar(request, response, upstream);
   }
 
   private opcional<T>(resposta: RespostaInterna, avisos: string[], aviso: string): T | null {
